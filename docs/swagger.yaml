@@ -1,0 +1,204 @@
+basePath: /api
+definitions:
+  models.HealthResponse:
+    properties:
+      status:
+        type: string
+      timestamp:
+        type: string
+      version:
+        type: string
+    type: object
+  models.LeaderboardEntry:
+    properties:
+      rank:
+        type: integer
+      score:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  models.PlayerRankResponse:
+    properties:
+      game_id:
+        type: integer
+      percentile:
+        type: number
+      rank:
+        type: integer
+      score:
+        type: integer
+      total_players:
+        type: integer
+      user_id:
+        type: integer
+      window:
+        type: string
+    type: object
+  models.Score:
+    properties:
+      game_id:
+        type: integer
+      score:
+        type: integer
+      timestamp:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  models.TopLeadersResponse:
+    properties:
+      game_id:
+        type: integer
+      leaders:
+        items:
+          $ref: '#/definitions/models.LeaderboardEntry'
+        type: array
+      window:
+        description: TotalPlayers uint64             `json:"total_players"`
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: http://www.example.com/support
+  description: A leaderboard service API for real-time game scores
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Leaderboard Realtime API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns the current status of the API
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HealthResponse'
+      summary: Health check endpoint
+      tags:
+      - health
+  /leaderboard/rank/{gameId}/{userId}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the rank and percentile for a specific player in a game
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameId
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      - description: Time window (empty for all-time, 24h for last 24 hours, 3d for
+          3 days, 7d for 7 days)
+        enum:
+        - 24h
+        - 3d
+        - 7d
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.PlayerRankResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a player's rank
+      tags:
+      - leaderboard
+  /leaderboard/score:
+    post:
+      consumes:
+      - application/json
+      description: Records a new score for a player in a game
+      parameters:
+      - description: Score data
+        in: body
+        name: score
+        required: true
+        schema:
+          $ref: '#/definitions/models.Score'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Submit a player's score
+      tags:
+      - leaderboard
+  /leaderboard/top/{gameId}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the top scoring players for a specific game
+      parameters:
+      - description: Game ID
+        in: path
+        name: gameId
+        required: true
+        type: integer
+      - default: 10
+        description: Number of leaders to return
+        in: query
+        name: limit
+        type: integer
+      - description: Time window (empty for all-time, 24h for last 24 hours, 3d for
+          3 days, 7d for 7 days)
+        enum:
+        - 24h
+        - 3d
+        - 7d
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TopLeadersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get top leaders for a game
+      tags:
+      - leaderboard
+swagger: "2.0"

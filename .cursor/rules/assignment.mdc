@@ -1,0 +1,74 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Following is my assignment and we are going to use Rust + Actix + .. more libraries depending what we need .
+also we are on latest version of rust that is 1.86.0
+
+Assignment ->
+
+Take-Home Assignment: Real-Time Global Leaderboard Service
+1.0 Introduction
+Welcome! For this assignment, you'll be designing and implementing a core backend service for "Ringg-Play," a fictitious company hosting hundreds of hyper-casual mobile games. Your task is to build a "Real-Time Global Leaderboard as a Service."
+2.0 The Challenge
+Every game session at Ringg-Play streams player scores in the format {user_id, game_id, score, timestamp} to our backend. We need a robust and performant service to process these scores and provide leaderboard information.
+3.0 Core Functional Requirements
+Your service must expose a REST API (with an OpenAPI/Swagger specification) to handle the following:
+Score Ingestion:
+A mechanism to receive and process incoming player scores: { user_id, game_id, score, timestamp }.
+Live Top-K Leaders:
+Endpoint: GET /games/{game_id}/leaders?limit=K
+Functionality: Return the top K players (highest scores) for a given game_id.
+Player Rank & Percentile:
+Endpoint: GET /games/{game_id}/users/{user_id}/rank
+Functionality: Return the current rank and percentile of a specific user_id within a given game_id.
+Sliding-Window Leaderboards:
+The same queries as above (Top-K and Player Rank/Percentile) must also be supported for scores submitted only within the last 24 hours. This could be indicated by an additional query parameter (e.g., ?window=24h) or separate endpoints.
+Don’t need to implement but have a solution of how you would extend it to 3 days, 7 days etc.
+4.0 Performance & Operational Requirements
+Latency: For both Top-K and Rank queries, the P99 latency must be < 50 ms.
+Throughput: The service must sustain 10,000 score writes/second AND 5,000 leaderboard reads/second per game, operating on a single 4-core node (this is a baseline performance target). Assume 1 million gamers/users per game.
+Persistence: No loss of score data should occur if a service node dies.
+Recovery: In case of a node failure, the service (or its replacement) should be able to recover and resume serving requests with full data integrity within ≤ 60 seconds.
+5.0 Hard Constraints
+You must adhere to the following constraints:
+Memory Usage: The service process should consume ≤ 512 MB heap memory per node.
+External Data Stores:
+You may not use managed ranking services (e.g., Redis Sorted Sets).
+You must use a general-purpose datastore (e.g., PostgreSQL, MySQL, MongoDB, Cassandra) OR implement your own in-memory data structure solution that is flushed to disk / uses a Write-Ahead Log (WAL) for persistence.
+Programming Language: Choose any mainstream language you would comfortably run in a production environment (e.g., Go, Rust, Java/Kotlin, Python, TypeScript/Node.js).
+6.0 Nice-to-Have (Stretch Goals - Optional)
+If you have extra time and are looking for an additional challenge, consider:
+Horizontal Sharding: Propose a strategy for sharding the service by game_id (e.g., hash, range, or consistent hashing) to scale beyond a single node.
+Asynchronous Ingestion: Integrate an optional message queue (e.g., Kafka, NATS, Pulsar) for score ingestion.
+7.0 Deliverables
+Please provide the following in a Git repository (share access with us):
+Source Code: Your complete implementation.
+README.md:
+A clear architecture overview and discussion of trade-offs made.
+Instructions for local setup (e.g., make run or docker-compose up).
+Instructions on how to test your service.
+A summary of your design decisions, any known limitations, and potential future work.
+
+
+Design Document
+Detailed explanation of your chosen data structure(s) for Top-K and rank lookups, including Big-O analysis for key operations.
+Your persistence and recovery scheme.
+Your strategy for scaling beyond a single node (even if not fully implemented, discuss partitioning, cache warm-up, consistency model).
+Relevant diagrams (ASCII, Markdown UML, or image files committed to the repo are all acceptable).
+Test:
+Script to test your code.
+8.0 Evaluation Criteria
+We will be evaluating your submission based on:
+Correctness and completeness of the implemented features.
+Performance and efficiency of your solution, particularly regarding the Top-K and rank queries.
+Clarity and soundness of your design choices, especially for data structures and persistence.
+Code quality, readability, and maintainability.
+Quality and coverage of your tests.
+Thoroughness of your documentation.
+Good luck, and we look forward to seeing your solution!
+If you have any questions, drop a mail to kali@desivocal.com.
+
+
+
