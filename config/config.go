@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // ServerConfig holds the server configuration
@@ -22,10 +23,20 @@ type DatabaseConfig struct {
 	SSLMode  string
 }
 
+// KafkaConfig holds the Kafka configuration
+type KafkaConfig struct {
+	Brokers       []string
+	ScoresTopic   string
+	ConsumerGroup string
+	BatchSize     int
+	BatchTimeout  int // in seconds
+}
+
 // AppConfig holds the application configuration
 type AppConfig struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Kafka    KafkaConfig
 }
 
 // NewAppConfig creates a new AppConfig from environment variables
@@ -42,6 +53,13 @@ func NewAppConfig() *AppConfig {
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			Name:     getEnv("DB_NAME", "leaderboard"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+		},
+		Kafka: KafkaConfig{
+			Brokers:       strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","),
+			ScoresTopic:   getEnv("KAFKA_SCORES_TOPIC", "leaderboard-scores"),
+			ConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "score-processor"),
+			BatchSize:     getEnvAsInt("KAFKA_BATCH_SIZE", 100),
+			BatchTimeout:  getEnvAsInt("KAFKA_BATCH_TIMEOUT", 5),
 		},
 	}
 }

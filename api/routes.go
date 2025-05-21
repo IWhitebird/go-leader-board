@@ -2,10 +2,12 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/mq"
+	"github.com/ringg-play/leaderboard-realtime/internal/store"
 )
 
-func ConfigureRoutes(r *gin.Engine, store *db.LeaderboardStore, pgRepo db.PostgresRepositoryInterface) {
+func ConfigureRoutes(r *gin.Engine, store *store.LeaderboardStore, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) {
 	// API group
 	api := r.Group("/api")
 
@@ -22,6 +24,6 @@ func ConfigureRoutes(r *gin.Engine, store *db.LeaderboardStore, pgRepo db.Postgr
 		leaderboard.GET("/rank/:gameId/:userId", GetPlayerRankHandler(store))
 
 		// Submit a score
-		leaderboard.POST("/score", SubmitScoreHandler(store, pgRepo))
+		leaderboard.POST("/score", SubmitScoreHandler(store, pgRepo, producer))
 	}
 }

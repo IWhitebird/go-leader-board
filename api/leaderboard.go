@@ -5,9 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"log"
+
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/db"
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/mq"
+	"github.com/ringg-play/leaderboard-realtime/internal/store"
 )
 
 // GetTopLeadersHandler returns a handler for getting top leaders
@@ -21,8 +25,8 @@ import (
 // @Param        window  query     string  false  "Time window (empty for all-time, 24h for last 24 hours, 3d for 3 days, 7d for 7 days)" Enums(24h,3d,7d)
 // @Success      200     {object}  models.TopLeadersResponse
 // @Failure      400     {object}  map[string]string
-// @Router       /leaderboard/top/{gameId} [get]
-func GetTopLeadersHandler(store *db.LeaderboardStore) gin.HandlerFunc {
+// @Router       /api/leaderboard/top/{gameId} [get]
+func GetTopLeadersHandler(store *store.LeaderboardStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
@@ -70,8 +74,8 @@ func GetTopLeadersHandler(store *db.LeaderboardStore) gin.HandlerFunc {
 // @Success      200     {object}  models.PlayerRankResponse
 // @Failure      400     {object}  map[string]string
 // @Failure      404     {object}  map[string]string
-// @Router       /leaderboard/rank/{gameId}/{userId} [get]
-func GetPlayerRankHandler(store *db.LeaderboardStore) gin.HandlerFunc {
+// @Router       /api/leaderboard/rank/{gameId}/{userId} [get]
+func GetPlayerRankHandler(store *store.LeaderboardStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
@@ -122,8 +126,8 @@ func GetPlayerRankHandler(store *db.LeaderboardStore) gin.HandlerFunc {
 // @Param        score  body      models.Score  true  "Score data"
 // @Success      200
 // @Failure      400     {object}  map[string]string
-// @Router       /leaderboard/score [post]
-func SubmitScoreHandler(store *db.LeaderboardStore, pgRepo db.PostgresRepositoryInterface) gin.HandlerFunc {
+// @Router       /api/leaderboard/score [post]
+func SubmitScoreHandler(store *store.LeaderboardStore, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse score from request body
 		var score models.Score
@@ -144,15 +148,20 @@ func SubmitScoreHandler(store *db.LeaderboardStore, pgRepo db.PostgresRepository
 		}
 
 		// Add score to in-memory store
-		store.AddScore(score)
+		// store.AddScore(score)
 
-		// Save score to PostgreSQL in the background
-		go func() {
-			if err := pgRepo.SaveScore(score); err != nil {
-				// Log error, but don't block the request
-				// In a real application, consider using a retry mechanism
-			}
-		}()
+		// Send score to Kafka
+		if err := producer.SendScore(c.Request.Context(), score); err != nil {
+			// Log error, but don't block the request
+			log.Printf("Error sending score to Kafka: %v", err)
+
+			// As a fallback, save directly to PostgreSQL
+			go func() {
+				if err := pgRepo.SaveScore(score); err != nil {
+					log.Printf("Fallback PostgreSQL save failed: %v", err)
+				}
+			}()
+		}
 
 		// Return success
 		c.Status(http.StatusOK)

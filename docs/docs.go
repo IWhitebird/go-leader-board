@@ -9,22 +9,13 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.example.com/support",
-            "email": "support@example.com"
-        },
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/health": {
+        "/api/health": {
             "get": {
                 "description": "Returns the current status of the API",
                 "consumes": [
@@ -47,7 +38,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/leaderboard/rank/{gameId}/{userId}": {
+        "/api/leaderboard/rank/{gameId}/{userId}": {
             "get": {
                 "description": "Returns the rank and percentile for a specific player in a game",
                 "consumes": [
@@ -115,7 +106,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/leaderboard/score": {
+        "/api/leaderboard/score": {
             "post": {
                 "description": "Records a new score for a player in a game",
                 "consumes": [
@@ -155,7 +146,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/leaderboard/top/{gameId}": {
+        "/api/leaderboard/top/{gameId}": {
             "get": {
                 "description": "Returns the top scoring players for a specific game",
                 "consumes": [
@@ -310,12 +301,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
-	Host:             "localhost:8080",
-	BasePath:         "/api",
+	Version:          "",
+	Host:             "",
+	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Leaderboard Realtime API",
-	Description:      "A leaderboard service API for real-time game scores",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

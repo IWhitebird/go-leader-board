@@ -1,41 +1,40 @@
-package db
+package cache
 
 import (
 	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 const (
-	// MaxLevel is the maximum level of the skiplist
 	MaxLevel = 16
-	// P is the probability factor for the skiplist
-	P = 0.5
+	P        = 0.5
 )
 
-// SkipListNode represents a node in the skiplist
 type SkipListNode struct {
 	Score     uint64
 	UserID    int64
 	Timestamp time.Time
-	Forward   []*SkipListNode // Forward pointers
+	Forward   []*SkipListNode
 }
 
-// SkipList is a skiplist optimized for leaderboard operations
 type SkipList struct {
-	mu        sync.RWMutex
-	header    *SkipListNode
+	// Mu        sync.RWMutex
+	// Length    int
+	// Header    *SkipListNode
+
+	mu     sync.RWMutex
+	length int
+	header *SkipListNode
+
 	level     int
-	length    int
-	userIndex map[int64]*SkipListNode // Fast lookup by user ID
-	rand      *rand.Rand              // For level generation
+	userIndex map[int64]*SkipListNode
+	rand      *rand.Rand
 }
 
-// NewSkipList creates a new skiplist
 func NewSkipList() *SkipList {
-	// Create header node with maximum level
 	header := &SkipListNode{
 		Forward: make([]*SkipListNode, MaxLevel),
 	}

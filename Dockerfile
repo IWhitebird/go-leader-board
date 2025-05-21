@@ -12,7 +12,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o leaderboard-service .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o leaderboard-service ./cmd/leaderboard
 
 # Use a smaller image for the final container
 FROM alpine:3.21

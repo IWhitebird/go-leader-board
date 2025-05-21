@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 // HealthHandler returns a handler for the health endpoint
@@ -15,7 +15,7 @@ import (
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  models.HealthResponse
-// @Router       /health [get]
+// @Router       /api/health [get]
 func HealthHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		response := models.HealthResponse{

@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"fmt"
@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/models"
+	cache "github.com/ringg-play/leaderboard-realtime/internal/cache"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 // ScoreEntry represents a score with ordering metadata
@@ -19,20 +20,20 @@ type ScoreEntry struct {
 // GameLeaderboard manages scores for a single game
 type GameLeaderboard struct {
 	mu            sync.RWMutex
-	allTimeScores *SkipList           // Skiplist for all-time scores
-	recentScores  map[int64]*SkipList // Map of time window (hours) to skiplist for recent scores
+	allTimeScores *cache.SkipList           // Skiplist for all-time scores
+	recentScores  map[int64]*cache.SkipList // Map of time window (hours) to skiplist for recent scores
 }
 
 // NewGameLeaderboard creates a new game leaderboard
 func NewGameLeaderboard() *GameLeaderboard {
 	return &GameLeaderboard{
-		allTimeScores: NewSkipList(),
-		recentScores:  make(map[int64]*SkipList),
+		allTimeScores: cache.NewSkipList(),
+		recentScores:  make(map[int64]*cache.SkipList),
 	}
 }
 
 // getOrCreateRecentScores gets or creates a skiplist for the specified time window
-func (gl *GameLeaderboard) getOrCreateRecentScores(hours int64) *SkipList {
+func (gl *GameLeaderboard) getOrCreateRecentScores(hours int64) *cache.SkipList {
 	gl.mu.Lock()
 	defer gl.mu.Unlock()
 
@@ -45,7 +46,7 @@ func (gl *GameLeaderboard) getOrCreateRecentScores(hours int64) *SkipList {
 	}
 
 	// Create new skiplist for this time window
-	skiplist := NewSkipList()
+	skiplist := cache.NewSkipList()
 	gl.recentScores[hours] = skiplist
 	return skiplist
 }
@@ -82,7 +83,7 @@ func (gl *GameLeaderboard) GetTopK(k int, window models.TimeWindow) []models.Lea
 
 // GetRankAndPercentile gets a player's rank and percentile in the leaderboard
 func (gl *GameLeaderboard) GetRankAndPercentile(userID int64, window models.TimeWindow) (uint64, float64, uint64, uint64, bool) {
-	var skiplist *SkipList
+	var skiplist *cache.SkipList
 
 	if window.Hours <= 0 {
 		// All time scores
@@ -243,30 +244,30 @@ func (ls *LeaderboardStore) CreateSnapshot() error {
 	// Create a snapshot of all scores
 	snapshot := make(map[int64][]models.Score)
 
-	for gameID, leaderboard := range ls.leaderboards {
-		// Get all scores from the all-time skiplist
-		leaderboard.mu.RLock()
-		skiplist := leaderboard.allTimeScores
+	// for gameID, leaderboard := range ls.leaderboards {
+	// 	// Get all scores from the all-time skiplist
+	// 	leaderboard.mu.RLock()
+	// 	skiplist := leaderboard.allTimeScores
 
-		// Convert skiplist to scores
-		skiplist.mu.RLock()
-		node := skiplist.header.Forward[0]
-		scores := make([]models.Score, 0, skiplist.length)
+	// 	// Convert skiplist to scores
+	// 	skiplist.Mu.RLock()
+	// 	node := skiplist.Header.Forward[0]
+	// 	scores := make([]models.Score, 0, skiplist.Length)
 
-		for node != nil {
-			scores = append(scores, models.Score{
-				GameID:    gameID,
-				UserID:    node.UserID,
-				Score:     node.Score,
-				Timestamp: node.Timestamp,
-			})
-			node = node.Forward[0]
-		}
-		skiplist.mu.RUnlock()
-		leaderboard.mu.RUnlock()
+	// 	for node != nil {
+	// 		scores = append(scores, models.Score{
+	// 			GameID:    gameID,
+	// 			UserID:    node.UserID,
+	// 			Score:     node.Score,
+	// 			Timestamp: node.Timestamp,
+	// 		})
+	// 		node = node.Forward[0]
+	// 	}
+	// 	skiplist.Mu.RUnlock()
+	// 	leaderboard.mu.RUnlock()
 
-		snapshot[gameID] = scores
-	}
+	// 	snapshot[gameID] = scores
+	// }
 
 	// Log the snapshot to WAL
 	return ls.wal.LogSnapshot(snapshot)

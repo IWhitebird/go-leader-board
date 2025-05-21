@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 // PersistenceManager manages persistence of scores to disk
@@ -126,27 +126,29 @@ func getScoresForGame(store *LeaderboardStore, gameID int64) ([]models.Score, er
 	leaderboard.mu.RLock()
 	defer leaderboard.mu.RUnlock()
 
-	skiplist := leaderboard.allTimeScores
+	return nil, nil
 
-	// Lock the skiplist
-	skiplist.mu.RLock()
-	defer skiplist.mu.RUnlock()
+	// skiplist := leaderboard.allTimeScores
 
-	// Extract all scores
-	scores := make([]models.Score, 0, skiplist.length)
-	node := skiplist.header.Forward[0]
+	// // Lock the skiplist
+	// skiplist.Mu.RLock()
+	// defer skiplist.Mu.RUnlock()
 
-	for node != nil {
-		scores = append(scores, models.Score{
-			GameID:    gameID,
-			UserID:    node.UserID,
-			Score:     node.Score,
-			Timestamp: node.Timestamp,
-		})
-		node = node.Forward[0]
-	}
+	// // Extract all scores
+	// scores := make([]models.Score, 0, skiplist.Length)
+	// node := skiplist.Header.Forward[0]
 
-	return scores, nil
+	// for node != nil {
+	// 	scores = append(scores, models.Score{
+	// 		GameID:    gameID,
+	// 		UserID:    node.UserID,
+	// 		Score:     node.Score,
+	// 		Timestamp: node.Timestamp,
+	// 	})
+	// 	node = node.Forward[0]
+	// }
+
+	// return scores, nil
 }
 
 // LoadScores loads scores from the most recent snapshot

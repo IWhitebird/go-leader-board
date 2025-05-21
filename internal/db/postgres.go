@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/ringg-play/leaderboard-realtime/config"
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 // PostgresRepository handles database operations
@@ -21,6 +21,7 @@ type PostgresRepositoryInterface interface {
 	SaveScore(score models.Score) error
 	GetTopLeaders(gameID int64, limit int, window models.TimeWindow) ([]models.LeaderboardEntry, error)
 	GetPlayerRank(gameID, userID int64, window models.TimeWindow) (uint64, float64, uint64, uint64, error)
+	SaveScoreBatch(scores []models.Score) error
 }
 
 // CreatePool creates a new connection pool to the PostgreSQL database
@@ -239,4 +240,46 @@ SELECT
 	}
 
 	return rank, percentile, score, total, nil
+}
+
+// SaveScoreBatch saves multiple scores to the database in a single transaction
+func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
+	if len(scores) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Begin a transaction
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Prepare the statement for batch insert
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO scores (game_id, user_id, score, timestamp)
+		VALUES ($1, $2, $3, $4)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// Execute for each score
+	for _, score := range scores {
+		_, err = stmt.ExecContext(ctx, score.GameID, score.UserID, score.Score, score.Timestamp)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }

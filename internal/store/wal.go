@@ -1,4 +1,4 @@
-package db
+package store
 
 import (
 	"bufio"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 const (

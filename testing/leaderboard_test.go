@@ -10,8 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
-	"github.com/ringg-play/leaderboard-realtime/db"
-	"github.com/ringg-play/leaderboard-realtime/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 

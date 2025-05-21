@@ -1,6 +1,7 @@
 .PHONY: build run dev clean test swagger-docs stress
 
 # Go build flags
+CUR_DIR = $(shell pwd)
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 BUILD_DIR ?= ./bin
@@ -12,11 +13,15 @@ VERSION ?= 1.0.0
 # Docker compose files
 DOCKER_COMPOSE = docker-compose.yml
 
+dev:
+	@echo "Starting development server with hot reload..."
+	@air
+
 # Build the application
 build:
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	@go build -o $(BUILD_DIR)/$(APP_NAME) .
+	@go build -o $(BUILD_DIR)/$(APP_NAME) ./cmd/leaderboard
 
 # Run the application
 run: build
@@ -33,6 +38,7 @@ clean:
 	@echo "Cleaning..."
 	@rm -rf $(BUILD_DIR)
 	@rm -rf tmp
+	@rm -rf docs
 
 # Run tests
 test:
@@ -42,7 +48,7 @@ test:
 # Generate Swagger documentation
 swagger-docs:
 	@echo "Generating Swagger documentation..."
-	@swag init
+	@swag init -g ./cmd/leaderboard/main.go -o ./docs
 
 
 stress:

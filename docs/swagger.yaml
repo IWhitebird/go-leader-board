@@ -1,4 +1,3 @@
-basePath: /api
 definitions:
   models.HealthResponse:
     properties:
@@ -58,21 +57,10 @@ definitions:
         description: TotalPlayers uint64             `json:"total_players"`
         type: string
     type: object
-host: localhost:8080
 info:
-  contact:
-    email: support@example.com
-    name: API Support
-    url: http://www.example.com/support
-  description: A leaderboard service API for real-time game scores
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
-  termsOfService: http://swagger.io/terms/
-  title: Leaderboard Realtime API
-  version: "1.0"
+  contact: {}
 paths:
-  /health:
+  /api/health:
     get:
       consumes:
       - application/json
@@ -87,7 +75,7 @@ paths:
       summary: Health check endpoint
       tags:
       - health
-  /leaderboard/rank/{gameId}/{userId}:
+  /api/leaderboard/rank/{gameId}/{userId}:
     get:
       consumes:
       - application/json
@@ -134,7 +122,7 @@ paths:
       summary: Get a player's rank
       tags:
       - leaderboard
-  /leaderboard/score:
+  /api/leaderboard/score:
     post:
       consumes:
       - application/json
@@ -160,7 +148,7 @@ paths:
       summary: Submit a player's score
       tags:
       - leaderboard
-  /leaderboard/top/{gameId}:
+  /api/leaderboard/top/{gameId}:
     get:
       consumes:
       - application/json

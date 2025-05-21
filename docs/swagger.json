@@ -1,24 +1,10 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "A leaderboard service API for real-time game scores",
-        "title": "Leaderboard Realtime API",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.example.com/support",
-            "email": "support@example.com"
-        },
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
-        },
-        "version": "1.0"
+        "contact": {}
     },
-    "host": "localhost:8080",
-    "basePath": "/api",
     "paths": {
-        "/health": {
+        "/api/health": {
             "get": {
                 "description": "Returns the current status of the API",
                 "consumes": [
@@ -41,7 +27,7 @@
                 }
             }
         },
-        "/leaderboard/rank/{gameId}/{userId}": {
+        "/api/leaderboard/rank/{gameId}/{userId}": {
             "get": {
                 "description": "Returns the rank and percentile for a specific player in a game",
                 "consumes": [
@@ -109,7 +95,7 @@
                 }
             }
         },
-        "/leaderboard/score": {
+        "/api/leaderboard/score": {
             "post": {
                 "description": "Records a new score for a player in a game",
                 "consumes": [
@@ -149,7 +135,7 @@
                 }
             }
         },
-        "/leaderboard/top/{gameId}": {
+        "/api/leaderboard/top/{gameId}": {
             "get": {
                 "description": "Returns the top scoring players for a specific game",
                 "consumes": [
