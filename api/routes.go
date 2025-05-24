@@ -7,7 +7,7 @@ import (
 	"github.com/ringg-play/leaderboard-realtime/internal/store"
 )
 
-func ConfigureRoutes(r *gin.Engine, store *store.LeaderboardStore, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) {
+func ConfigureRoutes(r *gin.Engine, store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) {
 	// API group
 	api := r.Group("/api")
 

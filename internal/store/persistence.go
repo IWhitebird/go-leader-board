@@ -15,12 +15,12 @@ import (
 // PersistenceManager manages persistence of scores to disk
 type PersistenceManager struct {
 	dataDir string
-	store   *LeaderboardStore
+	store   *Store
 	mutex   sync.Mutex
 }
 
 // NewPersistenceManager creates a new persistence manager
-func NewPersistenceManager(dataDir string, store *LeaderboardStore) (*PersistenceManager, error) {
+func NewPersistenceManager(dataDir string, store *Store) (*PersistenceManager, error) {
 	pm := &PersistenceManager{
 		dataDir: dataDir,
 		store:   store,
@@ -113,42 +113,16 @@ func (pm *PersistenceManager) SaveScores() error {
 }
 
 // getScoresForGame extracts all scores for a game from the leaderboard store
-func getScoresForGame(store *LeaderboardStore, gameID int64) ([]models.Score, error) {
-	store.mu.RLock()
-	leaderboard, exists := store.leaderboards[gameID]
-	store.mu.RUnlock()
+func getScoresForGame(store *Store, gameID int64) ([]models.Score, error) {
+	leaderboard := store.GetLeaderboard(gameID)
 
-	if !exists {
+	if leaderboard == nil {
 		return []models.Score{}, nil
 	}
 
-	// Access the skiplist and extract all nodes
-	leaderboard.mu.RLock()
-	defer leaderboard.mu.RUnlock()
+	leaderboard.GetTopK(10, models.AllTime)
 
 	return nil, nil
-
-	// skiplist := leaderboard.allTimeScores
-
-	// // Lock the skiplist
-	// skiplist.Mu.RLock()
-	// defer skiplist.Mu.RUnlock()
-
-	// // Extract all scores
-	// scores := make([]models.Score, 0, skiplist.Length)
-	// node := skiplist.Header.Forward[0]
-
-	// for node != nil {
-	// 	scores = append(scores, models.Score{
-	// 		GameID:    gameID,
-	// 		UserID:    node.UserID,
-	// 		Score:     node.Score,
-	// 		Timestamp: node.Timestamp,
-	// 	})
-	// 	node = node.Forward[0]
-	// }
-
-	// return scores, nil
 }
 
 // LoadScores loads scores from the most recent snapshot

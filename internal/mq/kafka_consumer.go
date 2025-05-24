@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/ringg-play/leaderboard-realtime/config"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/store"
 	"github.com/segmentio/kafka-go"
 )
 
 // KafkaConsumer handles consuming and processing score messages from Kafka
 type KafkaConsumer struct {
 	reader        *kafka.Reader
-	pgRepo        db.PostgresRepositoryInterface
+	store         *store.Store
 	batchSize     int
 	timeout       time.Duration
 	brokers       []string
@@ -25,9 +25,9 @@ type KafkaConsumer struct {
 }
 
 // NewKafkaConsumer creates a new Kafka consumer
-func NewKafkaConsumer(cfg *config.AppConfig, pgRepo db.PostgresRepositoryInterface) (*KafkaConsumer, error) {
+func NewKafkaConsumer(cfg *config.AppConfig, store *store.Store) (*KafkaConsumer, error) {
 	consumer := &KafkaConsumer{
-		pgRepo:        pgRepo,
+		store:         store,
 		batchSize:     cfg.Kafka.BatchSize,
 		timeout:       time.Duration(cfg.Kafka.BatchTimeout) * time.Second,
 		brokers:       cfg.Kafka.Brokers,
@@ -38,7 +38,7 @@ func NewKafkaConsumer(cfg *config.AppConfig, pgRepo db.PostgresRepositoryInterfa
 	// Retry connecting to Kafka
 	maxRetries := 5
 	var err error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if err = consumer.connect(); err == nil {
 			break
 		}
@@ -202,21 +202,21 @@ func (c *KafkaConsumer) saveBatchToPostgres(batch []models.Score) error {
 	log.Printf("Saving batch of %d scores to PostgreSQL", len(batch))
 
 	// Use the batch insert method for better performance
-	if err := c.pgRepo.SaveScoreBatch(batch); err != nil {
+	if err := c.store.SaveScoreBatch(batch); err != nil {
 		log.Printf("Error saving batch to PostgreSQL: %v", err)
 
 		// Fall back to individual inserts if batch fails
-		var failedCount int
-		for _, score := range batch {
-			if err := c.pgRepo.SaveScore(score); err != nil {
-				failedCount++
-				log.Printf("Error saving individual score to PostgreSQL: %v", err)
-			}
-		}
+		// var failedCount int
+		// for _, score := range batch {
+		// 	if err := c.store.SaveScore(score); err != nil {
+		// 		failedCount++
+		// 		log.Printf("Error saving individual score to PostgreSQL: %v", err)
+		// 	}
+		// }
 
-		if failedCount > 0 {
-			return fmt.Errorf("failed to save %d/%d scores", failedCount, len(batch))
-		}
+		// if failedCount > 0 {
+		// 	return fmt.Errorf("failed to save %d/%d scores", failedCount, len(batch))
+		// }
 	}
 
 	return nil

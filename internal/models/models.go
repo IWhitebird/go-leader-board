@@ -6,12 +6,35 @@ import (
 	"time"
 )
 
+// HealthResponse is the response for the health endpoint
+type HealthResponse struct {
+	Status    string    `json:"status"`
+	Version   string    `json:"version"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // Score represents a player's score in a game
 type Score struct {
 	GameID    int64     `json:"game_id"`
 	UserID    int64     `json:"user_id"`
 	Score     uint64    `json:"score"`
 	Timestamp time.Time `json:"timestamp"`
+}
+
+func ScoreCompare(a, b Score) int {
+	if a.Score != b.Score {
+		if a.Score > b.Score {
+			return -1
+		}
+		return 1
+	}
+	if a.Timestamp != b.Timestamp {
+		if a.Timestamp.Before(b.Timestamp) {
+			return -1
+		}
+		return 1
+	}
+	return 0
 }
 
 // LeaderboardEntry represents a player's position on the leaderboard
@@ -23,10 +46,10 @@ type LeaderboardEntry struct {
 
 // TopLeadersResponse is the response for the top leaders endpoint
 type TopLeadersResponse struct {
-	GameID  int64              `json:"game_id"`
-	Leaders []LeaderboardEntry `json:"leaders"`
-	// TotalPlayers uint64             `json:"total_players"`
-	Window string `json:"window,omitempty"`
+	GameID       int64              `json:"game_id"`
+	Leaders      []LeaderboardEntry `json:"leaders"`
+	TotalPlayers uint64             `json:"total_players"`
+	Window       string             `json:"window,omitempty"`
 }
 
 // PlayerRankResponse is the response for the player rank endpoint
@@ -38,13 +61,6 @@ type PlayerRankResponse struct {
 	Percentile   float64 `json:"percentile"`
 	TotalPlayers uint64  `json:"total_players"`
 	Window       string  `json:"window,omitempty"`
-}
-
-// HealthResponse is the response for the health endpoint
-type HealthResponse struct {
-	Status    string    `json:"status"`
-	Version   string    `json:"version"`
-	Timestamp time.Time `json:"timestamp"`
 }
 
 // TimeWindow represents the time period for leaderboard queries
@@ -65,6 +81,17 @@ var (
 
 // FromQueryParam converts a query parameter to a TimeWindow
 func FromQueryParam(window string) TimeWindow {
+
+	// switch window {
+	// case "24h":
+	// 	return 24
+	// case "3d":
+	// 	return 72
+	// case "7d":
+	// 	return 168
+	// default:
+	// 	return 0
+	// }
 	if window == "" {
 		return AllTime
 	}
@@ -91,7 +118,7 @@ func FromQueryParam(window string) TimeWindow {
 		}
 	}
 
-	// Default to all time if parameter is not recognized
+	// // Default to all time if parameter is not recognized
 	return AllTime
 }
 

@@ -4,8 +4,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 const (
@@ -13,42 +11,39 @@ const (
 	P        = 0.5
 )
 
-type SkipListNode struct {
-	Score     uint64
-	UserID    int64
-	Timestamp time.Time
-	Forward   []*SkipListNode
+type SkipListNode[K comparable, V any] struct {
+	Key     K
+	Value   V
+	Forward []*SkipListNode[K, V]
 }
 
-type SkipList struct {
-	// Mu        sync.RWMutex
-	// Length    int
-	// Header    *SkipListNode
+type CompareFunc[K comparable] func(a, b K) int
 
-	mu     sync.RWMutex
-	length int
-	header *SkipListNode
-
-	level     int
-	userIndex map[int64]*SkipListNode
-	rand      *rand.Rand
+type SkipList[K comparable, V any] struct {
+	mu       sync.RWMutex
+	length   int
+	header   *SkipListNode[K, V]
+	level    int
+	keyIndex map[K]*SkipListNode[K, V]
+	rand     *rand.Rand
+	compare  CompareFunc[K]
 }
 
-func NewSkipList() *SkipList {
-	header := &SkipListNode{
-		Forward: make([]*SkipListNode, MaxLevel),
+func NewSkipList[K comparable, V any](compareFunc CompareFunc[K]) *SkipList[K, V] {
+	header := &SkipListNode[K, V]{
+		Forward: make([]*SkipListNode[K, V], MaxLevel),
 	}
 
-	return &SkipList{
-		header:    header,
-		level:     1,
-		userIndex: make(map[int64]*SkipListNode),
-		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+	return &SkipList[K, V]{
+		header:   header,
+		level:    1,
+		keyIndex: make(map[K]*SkipListNode[K, V]),
+		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		compare:  compareFunc,
 	}
 }
 
-// randomLevel generates a random level for a new node
-func (sl *SkipList) randomLevel() int {
+func (sl *SkipList[K, V]) randomLevel() int {
 	level := 1
 	for level < MaxLevel && sl.rand.Float64() < P {
 		level++
@@ -56,35 +51,25 @@ func (sl *SkipList) randomLevel() int {
 	return level
 }
 
-// Insert adds or updates a score in the skiplist
-func (sl *SkipList) Insert(userID int64, score uint64, timestamp time.Time) bool {
+func (sl *SkipList[K, V]) Insert(key K, value V) bool {
 	sl.mu.Lock()
 	defer sl.mu.Unlock()
 
-	// Check if user already exists
-	if existing, exists := sl.userIndex[userID]; exists {
-		// If the new score is not better, don't update
-		if existing.Score >= score {
-			return false
-		}
-		// Otherwise, remove the existing node
-		sl.deleteNode(userID, existing.Score)
+	if existing, exists := sl.keyIndex[key]; exists {
+		existing.Value = value
+		return false
 	}
 
-	// Create update array to track changes at each level
-	update := make([]*SkipListNode, MaxLevel)
+	update := make([]*SkipListNode[K, V], MaxLevel)
 	x := sl.header
 
-	// Start from highest level and work down
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil && (x.Forward[i].Score > score ||
-			(x.Forward[i].Score == score && x.Forward[i].UserID < userID)) {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, key) < 0 {
 			x = x.Forward[i]
 		}
 		update[i] = x
 	}
 
-	// Generate random level for new node
 	newLevel := sl.randomLevel()
 	if newLevel > sl.level {
 		for i := sl.level; i < newLevel; i++ {
@@ -93,45 +78,38 @@ func (sl *SkipList) Insert(userID int64, score uint64, timestamp time.Time) bool
 		sl.level = newLevel
 	}
 
-	// Create new node
-	newNode := &SkipListNode{
-		Score:     score,
-		UserID:    userID,
-		Timestamp: timestamp,
-		Forward:   make([]*SkipListNode, newLevel),
+	newNode := &SkipListNode[K, V]{
+		Key:     key,
+		Value:   value,
+		Forward: make([]*SkipListNode[K, V], newLevel),
 	}
 
-	// Insert the node at all levels
 	for i := 0; i < newLevel; i++ {
 		newNode.Forward[i] = update[i].Forward[i]
 		update[i].Forward[i] = newNode
 	}
 
-	// Update user index
-	sl.userIndex[userID] = newNode
+	sl.keyIndex[key] = newNode
 	sl.length++
 	return true
 }
 
-// deleteNode removes a node from the skiplist
-func (sl *SkipList) deleteNode(userID int64, score uint64) {
-	update := make([]*SkipListNode, MaxLevel)
+func (sl *SkipList[K, V]) Delete(key K) bool {
+	sl.mu.Lock()
+	defer sl.mu.Unlock()
+
+	update := make([]*SkipListNode[K, V], MaxLevel)
 	x := sl.header
 
-	// Find node at each level
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil &&
-			(x.Forward[i].Score > score ||
-				(x.Forward[i].Score == score && x.Forward[i].UserID < userID)) {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, key) < 0 {
 			x = x.Forward[i]
 		}
 		update[i] = x
 	}
 
-	// First node in the level is the candidate for removal
 	x = x.Forward[0]
-	if x != nil && x.UserID == userID && x.Score == score {
-		// Remove node at each level
+	if x != nil && sl.compare(x.Key, key) == 0 {
 		for i := 0; i < sl.level; i++ {
 			if update[i].Forward[i] != x {
 				break
@@ -139,58 +117,69 @@ func (sl *SkipList) deleteNode(userID int64, score uint64) {
 			update[i].Forward[i] = x.Forward[i]
 		}
 
-		// Update the level of the skiplist if needed
 		for sl.level > 1 && sl.header.Forward[sl.level-1] == nil {
 			sl.level--
 		}
 
-		// Remove from user index
-		delete(sl.userIndex, userID)
+		delete(sl.keyIndex, key)
 		sl.length--
+		return true
 	}
+	return false
 }
 
-// GetRank returns the rank of a user (1-based, highest score = rank 1)
-func (sl *SkipList) GetRank(userID int64) (uint64, uint64, bool) {
-	sl.mu.RLock()
-	defer sl.mu.RUnlock()
+func (sl *SkipList[K, V]) Search(key K) (V, bool) {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
 
-	// Check if user exists
-	node, exists := sl.userIndex[userID]
+	node, exists := sl.keyIndex[key]
 	if !exists {
-		return 0, 0, false
+		var zero V
+		return zero, false
+	}
+	return node.Value, true
+}
+
+func (sl *SkipList[K, V]) GetRank(key K) (int, bool) {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+
+	node, exists := sl.keyIndex[key]
+	if !exists {
+		return 0, false
 	}
 
-	// Count nodes with higher scores
-	var rank uint64 = 1
+	rank := 1
 	x := sl.header
 
-	// Start from highest level and work down
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil && (x.Forward[i].Score > node.Score ||
-			(x.Forward[i].Score == node.Score && x.Forward[i].UserID < node.UserID)) {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, node.Key) < 0 {
 			rank++
 			x = x.Forward[i]
 		}
 	}
 
-	return rank, node.Score, true
+	return rank, true
 }
 
-// GetTopK returns the top K entries from the skiplist
-func (sl *SkipList) GetTopK(k int) []models.LeaderboardEntry {
-	sl.mu.RLock()
-	defer sl.mu.RUnlock()
+type Entry[K comparable, V any] struct {
+	Key   K
+	Value V
+	Rank  int
+}
 
-	result := make([]models.LeaderboardEntry, 0, k)
+func (sl *SkipList[K, V]) GetTopK(k int) []Entry[K, V] {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+
+	result := make([]Entry[K, V], 0, k)
 	x := sl.header.Forward[0]
 
-	// Get the top k entries
 	for i := 0; i < k && x != nil; i++ {
-		result = append(result, models.LeaderboardEntry{
-			UserID: x.UserID,
-			Score:  x.Score,
-			Rank:   uint64(i + 1),
+		result = append(result, Entry[K, V]{
+			Key:   x.Key,
+			Value: x.Value,
+			Rank:  i + 1,
 		})
 		x = x.Forward[0]
 	}
@@ -198,29 +187,54 @@ func (sl *SkipList) GetTopK(k int) []models.LeaderboardEntry {
 	return result
 }
 
-// GetLength returns the number of entries in the skiplist
-func (sl *SkipList) GetLength() int {
-	sl.mu.RLock()
-	defer sl.mu.RUnlock()
+func (sl *SkipList[K, V]) GetAll() []Entry[K, V] {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+
+	result := make([]Entry[K, V], 0, sl.length)
+	x := sl.header.Forward[0]
+	rank := 1
+
+	for x != nil {
+		result = append(result, Entry[K, V]{
+			Key:   x.Key,
+			Value: x.Value,
+			Rank:  rank,
+		})
+		x = x.Forward[0]
+		rank++
+	}
+
+	return result
+}
+
+func (sl *SkipList[K, V]) GetLength() int {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
 	return sl.length
 }
 
-// Contains checks if a user exists in the skiplist
-func (sl *SkipList) Contains(userID int64) bool {
-	sl.mu.RLock()
-	defer sl.mu.RUnlock()
-	_, exists := sl.userIndex[userID]
+func (sl *SkipList[K, V]) Contains(key K) bool {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+	_, exists := sl.keyIndex[key]
 	return exists
 }
 
-// GetPercentile calculates the percentile of a user
-func (sl *SkipList) GetPercentile(rank uint64) float64 {
-	sl.mu.RLock()
-	defer sl.mu.RUnlock()
+func (sl *SkipList[K, V]) IsEmpty() bool {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+	return sl.length == 0
+}
 
-	if sl.length == 0 {
-		return 0.0
+func (sl *SkipList[K, V]) Clear() {
+	// sl.mu.Lock()
+	// defer sl.mu.Unlock()
+
+	sl.header = &SkipListNode[K, V]{
+		Forward: make([]*SkipListNode[K, V], MaxLevel),
 	}
-
-	return 100.0 * float64(sl.length-int(rank)) / float64(sl.length)
+	sl.level = 1
+	sl.length = 0
+	sl.keyIndex = make(map[K]*SkipListNode[K, V])
 }

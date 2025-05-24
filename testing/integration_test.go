@@ -12,12 +12,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/store"
 	"github.com/stretchr/testify/assert"
 )
 
-func setupTestServer(t *testing.T) (*gin.Engine, *db.LeaderboardStore) {
+func setupTestServer(t *testing.T) (*gin.Engine, *store.Store) {
 	gin.SetMode(gin.TestMode)
 
 	// Create temp data directory
@@ -33,16 +33,13 @@ func setupTestServer(t *testing.T) (*gin.Engine, *db.LeaderboardStore) {
 	}
 
 	// Initialize in-memory store
-	store := db.NewLeaderboardStore()
+	store := store.NewStore(nil)
 
 	// Create a router
 	router := gin.New()
 
-	// Create a mock PostgreSQL repository
-	pgRepo := &mockPgRepo{}
-
 	// Configure routes
-	api.ConfigureRoutes(router, store, pgRepo)
+	api.ConfigureRoutes(router, store, nil, nil)
 
 	return router, store
 }

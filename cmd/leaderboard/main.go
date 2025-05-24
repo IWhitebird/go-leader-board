@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -33,14 +32,13 @@ func main() {
 	cfg := config.NewAppConfig()
 	log.Printf("Configuration: %+v", cfg)
 
-	_, walDir := setupDirectories()
-	store := setupStore(walDir)
-	defer store.Close()
-
 	pgPool, pgRepo := setupPostgres(cfg)
 	defer pgPool.Close()
 
-	producer, consumer := setupKafka(cfg, pgRepo, ctx)
+	store := setupStore(pgRepo)
+	defer store.Close()
+
+	producer, consumer := setupKafka(cfg, store, ctx)
 	defer producer.Close()
 	defer consumer.Close()
 
@@ -51,26 +49,9 @@ func main() {
 	startServer(cfg, server)
 }
 
-func setupDirectories() (string, string) {
-	dataDir := "data"
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		log.Fatalf("Failed to create data directory: %v", err)
-	}
-
-	walDir := filepath.Join(dataDir, "wal")
-	if err := os.MkdirAll(walDir, 0755); err != nil {
-		log.Fatalf("Failed to create WAL directory: %v", err)
-	}
-
-	return dataDir, walDir
-}
-
-func setupStore(walDir string) *store.LeaderboardStore {
-	log.Println("Initializing in-memory store with WAL persistence")
-	store, err := store.NewLeaderboardStoreWithWAL(walDir)
-	if err != nil {
-		log.Fatalf("Failed to initialize store with WAL: %v", err)
-	}
+func setupStore(db *db.PostgresRepository) *store.Store {
+	log.Println("Initializing in-memory store")
+	store := store.NewStore(db)
 	return store
 }
 
@@ -91,7 +72,7 @@ func setupPostgres(cfg *config.AppConfig) (*sql.DB, *db.PostgresRepository) {
 	return pgPool, pgRepo
 }
 
-func setupKafka(cfg *config.AppConfig, pgRepo *db.PostgresRepository, ctx context.Context) (*mq.KafkaProducer, *mq.KafkaConsumer) {
+func setupKafka(cfg *config.AppConfig, store *store.Store, ctx context.Context) (*mq.KafkaProducer, *mq.KafkaConsumer) {
 	log.Println("Initializing Kafka producer")
 
 	// Add retry logic for Kafka initialization
@@ -100,7 +81,7 @@ func setupKafka(cfg *config.AppConfig, pgRepo *db.PostgresRepository, ctx contex
 	var err error
 
 	maxRetries := 5
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		producer, err = mq.NewKafkaProducer(cfg)
 		if err == nil {
 			break
@@ -115,8 +96,8 @@ func setupKafka(cfg *config.AppConfig, pgRepo *db.PostgresRepository, ctx contex
 	log.Println("Kafka producer initialized")
 
 	log.Println("Initializing Kafka consumer")
-	for i := 0; i < maxRetries; i++ {
-		consumer, err = mq.NewKafkaConsumer(cfg, pgRepo)
+	for i := range maxRetries {
+		consumer, err = mq.NewKafkaConsumer(cfg, store)
 		if err == nil {
 			break
 		}
@@ -134,7 +115,7 @@ func setupKafka(cfg *config.AppConfig, pgRepo *db.PostgresRepository, ctx contex
 	return producer, consumer
 }
 
-func setupRouter(store *store.LeaderboardStore, pgRepo *db.PostgresRepository, producer *mq.KafkaProducer) *gin.Engine {
+func setupRouter(store *store.Store, pgRepo *db.PostgresRepository, producer *mq.KafkaProducer) *gin.Engine {
 	router := gin.Default()
 	api.ConfigureRoutes(router, store, pgRepo, producer)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -145,6 +126,14 @@ func setupServer(cfg *config.AppConfig, router *gin.Engine) *http.Server {
 	return &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler: router,
+	}
+}
+
+func startServer(cfg *config.AppConfig, server *http.Server) {
+	log.Printf("Starting server on http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("Head to http://%s:%d/swagger/index.html to see the API documentation", cfg.Server.Host, cfg.Server.Port)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server error: %v", err)
 	}
 }
 
@@ -166,12 +155,4 @@ func handleGracefulShutdown(server *http.Server, cancel context.CancelFunc) {
 
 		log.Println("Server gracefully stopped")
 	}()
-}
-
-func startServer(cfg *config.AppConfig, server *http.Server) {
-	log.Printf("Starting server on http://%s:%d", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("Head to http://%s:%d/swagger/index.html to see the API documentation", cfg.Server.Host, cfg.Server.Port)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
-	}
 }

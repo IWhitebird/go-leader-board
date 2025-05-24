@@ -13,13 +13,11 @@ func TestGameLeaderboard_GetTopK(t *testing.T) {
 	gl := NewGameLeaderboard()
 	now := time.Now().UTC()
 
-	// Add scores with different timestamps
-	gl.AddScore(1, 100, now.Add(-25*time.Hour)) // Outside 24h window
-	gl.AddScore(2, 300, now)                    // Within 24h window
-	gl.AddScore(3, 200, now)                    // Within 24h window
-	gl.AddScore(4, 50, now)                     // Within 24h window
+	gl.AddScore(1, 100, now.Add(-25*time.Hour))
+	gl.AddScore(2, 300, now)
+	gl.AddScore(3, 200, now)
+	gl.AddScore(4, 50, now)
 
-	// Get top 2 for all time
 	topKAll := gl.GetTopK(2, models.AllTime)
 	assert.Equal(t, 2, len(topKAll))
 	assert.Equal(t, int64(2), topKAll[0].UserID)
@@ -27,7 +25,6 @@ func TestGameLeaderboard_GetTopK(t *testing.T) {
 	assert.Equal(t, int64(3), topKAll[1].UserID)
 	assert.Equal(t, uint64(200), topKAll[1].Score)
 
-	// Get top 2 for last 24 hours
 	topK24h := gl.GetTopK(2, models.Last24Hours)
 	assert.Equal(t, 2, len(topK24h))
 	assert.Equal(t, int64(2), topK24h[0].UserID)
@@ -68,7 +65,7 @@ func TestGameLeaderboard_GetRankAndPercentile(t *testing.T) {
 }
 
 func TestLeaderboardStore(t *testing.T) {
-	store := NewLeaderboardStore()
+	store := NewStore(nil)
 
 	// Test adding scores to different games
 	score1 := models.Score{GameID: 1, UserID: 1, Score: 100, Timestamp: time.Now().UTC()}

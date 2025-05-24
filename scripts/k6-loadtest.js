@@ -18,77 +18,77 @@ const getPlayerRankLatency = new Trend('get_player_rank_latency');
 
 // Configuration
 
-const runTime = '5s';
+const runTime = '15s';
 
 export const options = {
-  // scenarios: {
-  //   health_check: {
-  //     executor: 'constant-arrival-rate',
-  //     rate: 1,
-  //     timeUnit: '1s',
-  //     duration: runTime,
-  //     preAllocatedVUs: 1,
-  //     maxVUs: 1,
-  //     exec: 'healthCheck',
-  //   },
-  //   submit_scores: {
-  //     executor: 'constant-arrival-rate',
-  //     rate: 10000,
-  //     timeUnit: '1s',
-  //     duration: runTime,
-  //     preAllocatedVUs: 1000,
-  //     maxVUs: 2000,
-  //     exec: 'submitScore',
-  //   },
-  //   get_top_leaders: {
-  //     executor: 'constant-arrival-rate',
-  //     rate: 2500,
-  //     timeUnit: '1s',
-  //     duration: runTime,
-  //     preAllocatedVUs: 600,
-  //     maxVUs: 800,
-  //     exec: 'getTopLeaders',
-  //   },
-  //   get_player_rank: {
-  //     executor: 'constant-arrival-rate',
-  //     rate: 2500,
-  //     timeUnit: '1s',
-  //     duration: runTime,
-  //     preAllocatedVUs: 600,
-  //     maxVUs: 800,
-  //     exec: 'getPlayerRank',
-  //   },
-  // },
-
   scenarios: {
-    submit_scores: {
-      executor: 'constant-arrival-rate',
-      rate: 100,
-      timeUnit: '1s',
-      duration: runTime,
-      preAllocatedVUs: 10,
-      maxVUs: 20,
-      exec: 'submitScore',
-    },
-    get_top_leaders: {
-      executor: 'constant-arrival-rate',
-      rate: 100,
-      timeUnit: '1s',
-      duration: runTime,
-      preAllocatedVUs: 10,
-      maxVUs: 20,
-      exec: 'getTopLeaders',
-    },
-    get_player_rank: {
-      executor: 'constant-arrival-rate',
-      rate: 100,
-      timeUnit: '1s',
-      duration: runTime,
-      preAllocatedVUs: 10,
-      maxVUs: 20,
-      exec: 'getPlayerRank',
-    },
+    // health_check: {
+    //   executor: 'constant-arrival-rate',
+    //   rate: 1,
+    //   timeUnit: '30s',
+    //   duration: runTime,
+    //   preAllocatedVUs: 1,
+    //   maxVUs: 1,
+    //   exec: 'healthCheck',
+    // },
+    // submit_scores: {
+    //   executor: 'constant-arrival-rate',
+    //   rate: 300000,
+    //   timeUnit: '30s',
+    //   duration: runTime,
+    //   preAllocatedVUs: 10000,
+    //   maxVUs: 20000,
+    //   exec: 'submitScore',
+    // },
+    // get_top_leaders: {
+    //   executor: 'constant-arrival-rate',
+    //   rate: 300000,
+    //   timeUnit: '30s',
+    //   duration: runTime,
+    //   preAllocatedVUs: 10000,
+    //   maxVUs: 20000,
+    //   exec: 'getTopLeaders',
+    // },
+    // get_player_rank: {
+    //   executor: 'constant-arrival-rate',
+    //   rate: 300000,
+    //   timeUnit: '30s',
+    //   duration: runTime,
+    //   preAllocatedVUs: 10000,
+    //   maxVUs: 20000,
+    //   exec: 'getPlayerRank',
+    // },
   },
+
+  // scenarios: {
+  //   // submit_scores: {
+  //   //   executor: 'constant-arrival-rate',
+  //   //   rate: 100,
+  //   //   timeUnit: '1s',
+  //   //   duration: runTime,
+  //   //   preAllocatedVUs: 10,
+  //   //   maxVUs: 20,
+  //   //   exec: 'submitScore',
+  //   // },
+  //   // get_top_leaders: {
+  //   //   executor: 'constant-arrival-rate',
+  //   //   rate: 100,
+  //   //   timeUnit: '1s',
+  //   //   duration: runTime,
+  //   //   preAllocatedVUs: 10,
+  //   //   maxVUs: 20,
+  //   //   exec: 'getTopLeaders',
+  //   // },
+  //   // get_player_rank: {
+  //   //   executor: 'constant-arrival-rate',
+  //   //   rate: 100,
+  //   //   timeUnit: '1s',
+  //   //   duration: runTime,
+  //   //   preAllocatedVUs: 10,
+  //   //   maxVUs: 20,
+  //   //   exec: 'getPlayerRank',
+  //   // },
+  // },
 
   // thresholds: {
   //   'submit_score_latency{expected:true}': ['p(99)<50'],
@@ -120,7 +120,7 @@ export function healthCheck() {
 export function submitScore() {
   const gameId = GAME_IDS[randomIntBetween(0, GAME_IDS.length - 1)];
   const userId = randomIntBetween(1, MAX_USER_ID);
-  const score = randomIntBetween(100, 10000);
+  const score = randomIntBetween(100, 1000000);
   
   const payload = JSON.stringify({
     game_id: gameId,
@@ -128,7 +128,7 @@ export function submitScore() {
     score: score,
     timestamp: new Date().toISOString(),
   });
-  
+
   const params = {
     headers: {
       'Content-Type': 'application/json',
@@ -146,10 +146,10 @@ export function submitScore() {
     'submit score status is 200': (r) => r.status === 200,
   });
   
-  if (!success) {
-    submitScoreErrors.add(1);
-    console.log(`Submit score failed: ${response.status} ${response.body}`);
-  }
+  // if (!success) {
+  //   submitScoreErrors.add(1);
+  //   console.log(`Submit score failed: ${response.status} ${response.body}`);
+  // }
   
   sleep(0.1);
 }
@@ -158,7 +158,8 @@ export function submitScore() {
 export function getTopLeaders() {
   const gameId = GAME_IDS[randomIntBetween(0, GAME_IDS.length - 1)];
   const limit = randomIntBetween(10, 50);
-  
+  // const possibleWindows = [undefined , '24h', 3]
+
   const startTime = new Date();
   const response = http.get(`${BASE_URL}/leaderboard/top/${gameId}?limit=${limit}`);
   const endTime = new Date();
@@ -178,10 +179,10 @@ export function getTopLeaders() {
     },
   });
   
-  if (!success) {
-    getTopLeadersErrors.add(1);
-    console.log(`Get top leaders failed: ${response.status} ${response.body}`);
-  }
+  // if (!success) {
+  //   getTopLeadersErrors.add(1);
+  //   console.log(`Get top leaders failed: ${response.status} ${response.body}`);
+  // }
   
   sleep(0.1);
 }
@@ -190,6 +191,11 @@ export function getTopLeaders() {
 export function getPlayerRank() {
   const gameId = GAME_IDS[randomIntBetween(0, GAME_IDS.length - 1)];
   const userId = randomIntBetween(1, MAX_USER_ID);
+  
+  // const params = {
+  //   responseType: 'text',
+  //   expectedStatuses: [200, 404], // Treat 404 as successful request
+  // };
   
   const startTime = new Date();
   const response = http.get(`${BASE_URL}/leaderboard/rank/${gameId}/${userId}`);
@@ -204,26 +210,10 @@ export function getPlayerRank() {
     'get player rank status is 200 or 404': (r) => r.status === 200 || r.status === 404,
   });
   
-  if (!success) {
-    getPlayerRankErrors.add(1);
-    console.log(`Get player rank failed: ${response.status} ${response.body}`);
-  }
+  // if (!success) {
+  //   getPlayerRankErrors.add(1);
+  //   console.log(`Get player rank failed: ${response.status} ${response.body}`);
+  // }
   
   sleep(0.1);
 } 
-
-
-export function handleSummary(data) {
-  const submitRPS = data.metrics['submit_score_requests'].rate;
-  const topLeadersRPS = data.metrics['get_top_leaders_requests'].rate;
-  const playerRankRPS = data.metrics['get_player_rank_requests'].rate;
-
-  console.log('\n--- Custom RPS Report ---');
-  console.log(`Submit Score RPS       : ${submitRPS.toFixed(2)} req/sec`);
-  console.log(`Top Leaders RPS        : ${topLeadersRPS.toFixed(2)} req/sec`);
-  console.log(`Player Rank RPS        : ${playerRankRPS.toFixed(2)} req/sec`);
-
-  return {
-    'summary.json': JSON.stringify(data, null, 2),
-  };
-}

@@ -10,18 +10,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/ringg-play/leaderboard-realtime/internal/store"
 	"github.com/stretchr/testify/assert"
 )
 
-func setupRouter() (*gin.Engine, *db.LeaderboardStore) {
+func setupRouter() (*gin.Engine, *store.Store) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	store := db.NewLeaderboardStore()
-	pgRepo := &mockPgRepo{}
+	store := store.NewStore(nil)
 
-	api.ConfigureRoutes(router, store, pgRepo)
+	api.ConfigureRoutes(router, store, nil, nil)
 
 	return router, store
 }

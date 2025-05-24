@@ -26,7 +26,7 @@ import (
 // @Success      200     {object}  models.TopLeadersResponse
 // @Failure      400     {object}  map[string]string
 // @Router       /api/leaderboard/top/{gameId} [get]
-func GetTopLeadersHandler(store *store.LeaderboardStore) gin.HandlerFunc {
+func GetTopLeadersHandler(store *store.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
@@ -75,7 +75,7 @@ func GetTopLeadersHandler(store *store.LeaderboardStore) gin.HandlerFunc {
 // @Failure      400     {object}  map[string]string
 // @Failure      404     {object}  map[string]string
 // @Router       /api/leaderboard/rank/{gameId}/{userId} [get]
-func GetPlayerRankHandler(store *store.LeaderboardStore) gin.HandlerFunc {
+func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
@@ -127,7 +127,7 @@ func GetPlayerRankHandler(store *store.LeaderboardStore) gin.HandlerFunc {
 // @Success      200
 // @Failure      400     {object}  map[string]string
 // @Router       /api/leaderboard/score [post]
-func SubmitScoreHandler(store *store.LeaderboardStore, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
+func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse score from request body
 		var score models.Score
@@ -155,12 +155,6 @@ func SubmitScoreHandler(store *store.LeaderboardStore, pgRepo db.PostgresReposit
 			// Log error, but don't block the request
 			log.Printf("Error sending score to Kafka: %v", err)
 
-			// As a fallback, save directly to PostgreSQL
-			go func() {
-				if err := pgRepo.SaveScore(score); err != nil {
-					log.Printf("Fallback PostgreSQL save failed: %v", err)
-				}
-			}()
 		}
 
 		// Return success
