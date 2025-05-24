@@ -1,8 +1,10 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/internal/db"
@@ -23,6 +25,7 @@ import (
 // @Success      200     {object}  models.TopLeadersResponse
 // @Failure      400     {object}  map[string]string
 // @Router       /api/leaderboard/top/{gameId} [get]
+// @Example     {"game_id": 1, "user_id": 1, "score": 100, "timestamp": "2021-01-01T00:00:00Z"}
 func GetTopLeadersHandler(store *store.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse game ID from path
@@ -121,39 +124,37 @@ func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
 // @Tags         leaderboard
 // @Accept       json
 // @Produce      json
-// @Param        score  body      models.Score  true  "Score data"
+// @Param        gameId  path      int  true  "Game ID"
+// @Param        score   body      models.Score  true  "Score data"
 // @Success      200
 // @Failure      400     {object}  map[string]string
-// @Router       /api/leaderboard/score [post]
+// @Router       /api/leaderboard/score/{gameId} [post]
 func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse score from request body
-		// var score models.Score
-		// if err := c.ShouldBindJSON(&score); err != nil {
-		// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid score data"})
-		// 	return
-		// }
+		var score models.Score
+		if err := c.ShouldBindJSON(&score); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid score data"})
+			return
+		}
 
-		// // Set timestamp if not provided
-		// if score.Timestamp.IsZero() {
-		// 	score.Timestamp = time.Now().UTC()
-		// }
+		// Set timestamp if not provided
+		if score.Timestamp.IsZero() {
+			score.Timestamp = time.Now().UTC()
+		}
 
-		// // Validate score
-		// if score.GameID <= 0 || score.UserID <= 0 {
-		// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID or user ID"})
-		// 	return
-		// }
+		// Validate score
+		if score.GameID <= 0 || score.UserID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID or user ID"})
+			return
+		}
 
-		// // Add score to in-memory store
-		// // store.AddScore(score)
+		// Send score to Kafka
+		if err := producer.SendScore(c.Request.Context(), score); err != nil {
+			// Log error, but don't block the request
+			log.Printf("Error sending score to Kafka: %v", err)
 
-		// // Send score to Kafka
-		// if err := producer.SendScore(c.Request.Context(), score); err != nil {
-		// 	// Log error, but don't block the request
-		// 	log.Printf("Error sending score to Kafka: %v", err)
-
-		// }
+		}
 
 		// Return success
 		c.Status(http.StatusOK)

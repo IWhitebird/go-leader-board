@@ -104,6 +104,27 @@ func (gl *GameLeaderboard) AddScore(userID int64, score uint64, timestamp time.T
 	}
 }
 
+func (gl *GameLeaderboard) AddScoreBatch(scores []models.Score) {
+	for _, score := range scores {
+		gl.AddScore(score.UserID, score.Score, score.Timestamp)
+	}
+
+	// **Optimize this**
+	// var validScores []models.Score
+	// for _, score := range scores {
+	// 	for _, window := range models.AllTimeWindows() {
+	// 		if !gl.isScoreValid(window, score.Timestamp) {
+	// 			continue
+	// 		}
+	// 		validScores = append(validScores, score)
+	// 	}
+	// }
+
+	// for _, score := range validScores {
+	// 	gl.AddScore(score.UserID, score.Score, score.Timestamp)
+	// }
+}
+
 // GetTopK returns the top k entries from the leaderboard
 func (gl *GameLeaderboard) GetTopK(k int, window models.TimeWindow) []models.LeaderboardEntry {
 	var result []models.LeaderboardEntry

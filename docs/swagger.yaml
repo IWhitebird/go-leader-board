@@ -53,8 +53,9 @@ definitions:
         items:
           $ref: '#/definitions/models.LeaderboardEntry'
         type: array
+      total_players:
+        type: integer
       window:
-        description: TotalPlayers uint64             `json:"total_players"`
         type: string
     type: object
 info:
@@ -122,12 +123,17 @@ paths:
       summary: Get a player's rank
       tags:
       - leaderboard
-  /api/leaderboard/score:
+  /api/leaderboard/score/{gameId}:
     post:
       consumes:
       - application/json
       description: Records a new score for a player in a game
       parameters:
+      - description: Game ID
+        in: path
+        name: gameId
+        required: true
+        type: integer
       - description: Score data
         in: body
         name: score

@@ -157,7 +157,7 @@ func (p *KafkaProducer) SendScore(ctx context.Context, score models.Score) error
 
 	// Send message
 	msg := kafka.Message{
-		Key:   []byte(fmt.Sprintf("%d-%d", score.GameID, score.UserID)),
+		Key:   fmt.Appendf(nil, "%d-%d", score.GameID, score.UserID),
 		Value: scoreJSON,
 		Time:  time.Now(),
 	}

@@ -35,7 +35,7 @@ func main() {
 	pgPool, pgRepo := setupPostgres(cfg)
 	defer pgPool.Close()
 
-	store := setupStore(pgRepo)
+	store := setupStore(pgRepo, cfg)
 	defer store.Close()
 
 	producer, consumer := setupKafka(cfg, store, ctx)
@@ -49,9 +49,17 @@ func main() {
 	startServer(cfg, server)
 }
 
-func setupStore(db *db.PostgresRepository) *store.Store {
+func setupStore(db *db.PostgresRepository, cfg *config.AppConfig) *store.Store {
 	log.Println("Initializing in-memory store")
 	store := store.NewStore(db)
+
+	// Initialize the store from PostgreSQL database
+	log.Println("Loading existing data from PostgreSQL...")
+	if err := store.InitializeFromDatabase(cfg); err != nil {
+		log.Fatalf("Failed to initialize store from database: %v", err)
+	}
+	log.Println("Store initialization completed successfully")
+
 	return store
 }
 

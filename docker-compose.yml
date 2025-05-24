@@ -11,7 +11,10 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
-      - leaderboard
+      - leaderboard-1
+      - leaderboard-2
+      - leaderboard-3
+      - leaderboard-4
     restart: unless-stopped
     networks:
       - leaderboard-network
@@ -21,15 +24,15 @@ services:
       timeout: 10s
       retries: 3
 
-  leaderboard:
+  leaderboard-1:
     build:
       context: .
       dockerfile: Dockerfile
     expose:
-      - "8080"
+      - "8081"
     environment:
       - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8080
+      - SERVER_PORT=8081
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-postgres}
@@ -40,8 +43,9 @@ services:
       - KAFKA_BROKERS=kafka:9092
       - KAFKA_SCORES_TOPIC=leaderboard-scores
       - KAFKA_CONSUMER_GROUP=score-processor
+      - REPLICA_NUMBER=1
     volumes:
-      - leaderboard-data:/app/data
+      - leaderboard-data-1:/app/data
     depends_on:
       - postgres
       - kafka
@@ -49,17 +53,133 @@ services:
     networks:
       - leaderboard-network
     deploy:
-      mode: replicated
-      replicas: ${LEADERBOARD_REPLICAS:-4}
       resources:
         limits:
           cpus: '0.5'
           memory: 512M
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  leaderboard-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "8082"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8082
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=leaderboard
+      - DB_SSLMODE=disable
+      - GIN_MODE=release
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_SCORES_TOPIC=leaderboard-scores
+      - KAFKA_CONSUMER_GROUP=score-processor
+      - REPLICA_NUMBER=2
+    volumes:
+      - leaderboard-data-2:/app/data
+    depends_on:
+      - postgres
+      - kafka
+    restart: unless-stopped
+    networks:
+      - leaderboard-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  leaderboard-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "8083"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8083
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=leaderboard
+      - DB_SSLMODE=disable
+      - GIN_MODE=release
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_SCORES_TOPIC=leaderboard-scores
+      - KAFKA_CONSUMER_GROUP=score-processor
+      - REPLICA_NUMBER=3
+    volumes:
+      - leaderboard-data-3:/app/data
+    depends_on:
+      - postgres
+      - kafka
+    restart: unless-stopped
+    networks:
+      - leaderboard-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  leaderboard-4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "8084"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8084
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_NAME=leaderboard
+      - DB_SSLMODE=disable
+      - GIN_MODE=release
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_SCORES_TOPIC=leaderboard-scores
+      - KAFKA_CONSUMER_GROUP=score-processor
+      - REPLICA_NUMBER=4
+    volumes:
+      - leaderboard-data-4:/app/data
+    depends_on:
+      - postgres
+      - kafka
+    restart: unless-stopped
+    networks:
+      - leaderboard-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
   kafka:
     image: confluentinc/cp-kafka:latest
@@ -72,7 +192,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -131,7 +251,10 @@ services:
 
 volumes:
   postgres-data:
-  leaderboard-data:
+  leaderboard-data-1:
+  leaderboard-data-2:
+  leaderboard-data-3:
+  leaderboard-data-4:
   zookeeper-data:
   kafka-data:
 

@@ -106,7 +106,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/leaderboard/score": {
+        "/api/leaderboard/score/{gameId}": {
             "post": {
                 "description": "Records a new score for a player in a game",
                 "consumes": [
@@ -120,6 +120,13 @@ const docTemplate = `{
                 ],
                 "summary": "Submit a player's score",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Game ID",
+                        "name": "gameId",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "Score data",
                         "name": "score",
@@ -290,8 +297,10 @@ const docTemplate = `{
                         "$ref": "#/definitions/models.LeaderboardEntry"
                     }
                 },
+                "total_players": {
+                    "type": "integer"
+                },
                 "window": {
-                    "description": "TotalPlayers uint64             ` + "`" + `json:\"total_players\"` + "`" + `",
                     "type": "string"
                 }
             }

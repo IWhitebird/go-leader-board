@@ -22,6 +22,8 @@ type PostgresRepositoryInterface interface {
 	GetTopLeaders(gameID int64, limit int, window models.TimeWindow) ([]models.LeaderboardEntry, error)
 	GetPlayerRank(gameID, userID int64, window models.TimeWindow) (uint64, float64, uint64, uint64, error)
 	SaveScoreBatch(scores []models.Score) error
+	GetAllScores() ([]models.Score, error)
+	GetAllScoresForGame(gameID int64) ([]models.Score, error)
 }
 
 // CreatePool creates a new connection pool to the PostgreSQL database
@@ -282,4 +284,103 @@ func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 
 	// Commit the transaction
 	return tx.Commit()
+}
+
+func (r *PostgresRepository) GetAllGames() ([]int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	query := `
+SELECT DISTINCT game_id
+FROM scores
+ORDER BY game_id
+`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var games []int64
+	for rows.Next() {
+		var game int64
+		if err := rows.Scan(&game); err != nil {
+			return nil, err
+		}
+		games = append(games, game)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return games, nil
+}
+
+// GetAllScores gets all scores from the database for initialization
+func (r *PostgresRepository) GetAllScores() ([]models.Score, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	query := `
+SELECT game_id, user_id, score, timestamp
+FROM scores
+ORDER BY game_id, timestamp DESC
+`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var scores []models.Score
+	for rows.Next() {
+		var score models.Score
+		if err := rows.Scan(&score.GameID, &score.UserID, &score.Score, &score.Timestamp); err != nil {
+			return nil, err
+		}
+		scores = append(scores, score)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return scores, nil
+}
+
+// GetAllScoresForGame gets all scores for a specific game from the database
+func (r *PostgresRepository) GetAllScoresForGame(gameID int64) ([]models.Score, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	query := `
+SELECT game_id, user_id, score, timestamp
+FROM scores
+WHERE game_id = $1
+ORDER BY timestamp DESC
+`
+
+	rows, err := r.db.QueryContext(ctx, query, gameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var scores []models.Score
+	for rows.Next() {
+		var score models.Score
+		if err := rows.Scan(&score.GameID, &score.UserID, &score.Score, &score.Timestamp); err != nil {
+			return nil, err
+		}
+		scores = append(scores, score)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return scores, nil
 }

@@ -24,6 +24,6 @@ func ConfigureRoutes(r *gin.Engine, store *store.Store, pgRepo db.PostgresReposi
 		leaderboard.GET("/rank/:gameId/:userId", GetPlayerRankHandler(store))
 
 		// Submit a score
-		leaderboard.POST("/score", SubmitScoreHandler(store, pgRepo, producer))
+		leaderboard.POST("/score/:gameId", SubmitScoreHandler(store, pgRepo, producer))
 	}
 }

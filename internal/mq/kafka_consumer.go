@@ -199,24 +199,12 @@ func (c *KafkaConsumer) saveBatchToPostgres(batch []models.Score) error {
 		return nil
 	}
 
-	log.Printf("Saving batch of %d scores to PostgreSQL", len(batch))
+	log.Printf("Saving batch of %d scores to PostgreSQL and updating cache", len(batch))
 
-	// Use the batch insert method for better performance
+	// Use the batch insert method which now saves to PostgreSQL first, then cache
 	if err := c.store.SaveScoreBatch(batch); err != nil {
-		log.Printf("Error saving batch to PostgreSQL: %v", err)
-
-		// Fall back to individual inserts if batch fails
-		// var failedCount int
-		// for _, score := range batch {
-		// 	if err := c.store.SaveScore(score); err != nil {
-		// 		failedCount++
-		// 		log.Printf("Error saving individual score to PostgreSQL: %v", err)
-		// 	}
-		// }
-
-		// if failedCount > 0 {
-		// 	return fmt.Errorf("failed to save %d/%d scores", failedCount, len(batch))
-		// }
+		log.Printf("Error saving batch to PostgreSQL and cache: %v", err)
+		return fmt.Errorf("failed to save batch: %v", err)
 	}
 
 	return nil
