@@ -43,7 +43,7 @@ type AppConfig struct {
 func NewAppConfig() *AppConfig {
 	return &AppConfig{
 		Server: ServerConfig{
-			Host: getEnv("SERVER_HOST", "0.0.0.0"),
+			Host: getEnv("SERVER_HOST", "127.0.0.1"),
 			Port: getEnvAsInt("SERVER_PORT", 8080),
 		},
 		Database: DatabaseConfig{

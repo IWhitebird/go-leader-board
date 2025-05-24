@@ -1,4 +1,4 @@
-.PHONY: build run dev clean test swagger-docs stress
+.PHONY: build run dev clean test swagger-docs k6_stress wrk_stress
 
 # Go build flags
 CUR_DIR = $(shell pwd)
@@ -28,10 +28,6 @@ run: build
 	@echo "Running $(APP_NAME)..."
 	@$(BUILD_DIR)/$(APP_NAME)
 
-# Run with hot reloading using Air
-dev:
-	@echo "Starting development server with hot reload..."
-	@air
 
 # Clean build artifacts
 clean:
@@ -51,6 +47,17 @@ swagger-docs:
 	@swag init -g ./cmd/leaderboard/main.go -o ./docs
 
 
-stress:
+k6_stress:
 	@echo "Running stress test..."
-	@docker compose -f docker-compose.stress.yml up
+	@k6 run --out dashboard=export=./scripts/k6/test-report.html ./scripts/k6/k6-loadtest.js
+
+wrk_stress:
+	@echo "Running stress test in parallel with clean output..."
+	@mkdir -p logs
+	@parallel ::: \
+		"wrk -t12 -c1000 -d30s -s ./scripts/wrk/score_post.lua http://localhost:80 > logs/score_post.txt" \
+		"wrk -t12 -c1000 -d30s -s ./scripts/wrk/get_top_leaders.lua http://localhost:80 > logs/get_top_leaders.txt" \
+		"wrk -t12 -c1000 -d30s -s ./scripts/wrk/get_user_rank.lua http://localhost:80 > logs/get_user_rank.txt"
+	@echo "\n\033[1;34m=== score_post.lua ===\033[0m"; cat logs/score_post.txt
+	@echo "\n\033[1;32m=== get_top_leaders.lua ===\033[0m"; cat logs/get_top_leaders.txt
+	@echo "\n\033[1;35m=== get_user_rank.lua ===\033[0m"; cat logs/get_user_rank.txt

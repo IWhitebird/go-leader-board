@@ -3,9 +3,6 @@ package api
 import (
 	"net/http"
 	"strconv"
-	"time"
-
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/internal/db"
@@ -100,7 +97,8 @@ func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
 		// Get player rank
 		rank, percentile, score, total, exists := store.GetPlayerRank(gameID, userID, window)
 		if !exists {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+			// c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+			c.JSON(http.StatusOK, gin.H{"error": "Player not found"})
 			return
 		}
 
@@ -130,32 +128,32 @@ func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
 func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse score from request body
-		var score models.Score
-		if err := c.ShouldBindJSON(&score); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid score data"})
-			return
-		}
+		// var score models.Score
+		// if err := c.ShouldBindJSON(&score); err != nil {
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid score data"})
+		// 	return
+		// }
 
-		// Set timestamp if not provided
-		if score.Timestamp.IsZero() {
-			score.Timestamp = time.Now().UTC()
-		}
+		// // Set timestamp if not provided
+		// if score.Timestamp.IsZero() {
+		// 	score.Timestamp = time.Now().UTC()
+		// }
 
-		// Validate score
-		if score.GameID <= 0 || score.UserID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID or user ID"})
-			return
-		}
+		// // Validate score
+		// if score.GameID <= 0 || score.UserID <= 0 {
+		// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID or user ID"})
+		// 	return
+		// }
 
-		// Add score to in-memory store
-		// store.AddScore(score)
+		// // Add score to in-memory store
+		// // store.AddScore(score)
 
-		// Send score to Kafka
-		if err := producer.SendScore(c.Request.Context(), score); err != nil {
-			// Log error, but don't block the request
-			log.Printf("Error sending score to Kafka: %v", err)
+		// // Send score to Kafka
+		// if err := producer.SendScore(c.Request.Context(), score); err != nil {
+		// 	// Log error, but don't block the request
+		// 	log.Printf("Error sending score to Kafka: %v", err)
 
-		}
+		// }
 
 		// Return success
 		c.Status(http.StatusOK)

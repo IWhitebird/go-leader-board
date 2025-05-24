@@ -71,7 +71,27 @@ type TimeWindow struct {
 	Display string
 }
 
-// Predefined time windows
+// GetLeaderboardIndex returns the array index for this time window
+// This enables O(1) leaderboard access instead of map lookups
+func (w TimeWindow) GetLeaderboardIndex() int {
+	switch w.Hours {
+	case 0:
+		return 0 // AllTime
+	case 24:
+		return 1 // Last24Hours
+	case 72:
+		return 2 // Last3Days
+	case 168:
+		return 3 // Last7Days
+	default:
+		return 0 // Default to AllTime for unsupported windows
+	}
+}
+
+// LeaderboardIndexCount represents the total number of predefined leaderboard types
+const LeaderboardIndexCount = 4
+
+// Predefined time windows with their indices
 var (
 	AllTime     = TimeWindow{Hours: 0, Display: "all"}
 	Last24Hours = TimeWindow{Hours: 24, Display: "24h"}
@@ -79,19 +99,17 @@ var (
 	Last7Days   = TimeWindow{Hours: 168, Display: "7d"}
 )
 
-// FromQueryParam converts a query parameter to a TimeWindow
-func FromQueryParam(window string) TimeWindow {
+// AllTimeWindows returns all predefined time windows in index order
+func AllTimeWindows() [LeaderboardIndexCount]TimeWindow {
+	return [LeaderboardIndexCount]TimeWindow{
+		AllTime,     // index 0
+		Last24Hours, // index 1
+		Last3Days,   // index 2
+		Last7Days,   // index 3
+	}
+}
 
-	// switch window {
-	// case "24h":
-	// 	return 24
-	// case "3d":
-	// 	return 72
-	// case "7d":
-	// 	return 168
-	// default:
-	// 	return 0
-	// }
+func FromQueryParam(window string) TimeWindow {
 	if window == "" {
 		return AllTime
 	}

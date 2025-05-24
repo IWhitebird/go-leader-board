@@ -9,77 +9,50 @@ import (
 	models "github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
-type GameLeaderboardType int
-
-const (
-	AllTime GameLeaderboardType = iota
-	Last24Hours
-	Last3Days
-	Last7Days
-)
-
-// GlToTime maps leaderboard types to their hour values
-var GlToTime = map[GameLeaderboardType]int{
-	AllTime:     0,
-	Last24Hours: 24,
-	Last3Days:   72,
-	Last7Days:   168,
-}
-
-var TimeToGl = map[int]GameLeaderboardType{
-	0:   AllTime,
-	24:  Last24Hours,
-	72:  Last3Days,
-	168: Last7Days,
-}
-
 type LeaderBoard struct {
 	mu         sync.RWMutex
-	userScores map[int64]models.Score
-	scoresList *cache.SkipList[models.Score, int64]
+	scoresList *cache.SkipList[int64, models.Score]
 }
 
 type GameLeaderboard struct {
-	leaderboards map[GameLeaderboardType]*LeaderBoard
+	leaderboards [models.LeaderboardIndexCount]*LeaderBoard
 }
 
-// NewGameLeaderboard creates a new game leaderboard
 func NewGameLeaderboard() *GameLeaderboard {
-	gl := &GameLeaderboard{
-		leaderboards: make(map[GameLeaderboardType]*LeaderBoard),
-	}
+	gl := &GameLeaderboard{}
 
-	for boardType := range GlToTime {
-		gl.leaderboards[boardType] = &LeaderBoard{
-			scoresList: cache.NewSkipList[models.Score, int64](models.ScoreCompare),
-			userScores: make(map[int64]models.Score),
+	// Initialize all leaderboards using array indices for O(1) access
+	for i := range models.LeaderboardIndexCount {
+		gl.leaderboards[i] = &LeaderBoard{
+			scoresList: cache.NewSkipList[int64](models.ScoreCompare),
 		}
 	}
 	return gl
 }
 
-func (gl *GameLeaderboard) getLeaderboard(boardType GameLeaderboardType) *LeaderBoard {
-	if lb, exists := gl.leaderboards[boardType]; exists {
-		return lb
+func (gl *GameLeaderboard) getLeaderboard(window models.TimeWindow) *LeaderBoard {
+	index := window.GetLeaderboardIndex()
+	if index >= 0 && index < models.LeaderboardIndexCount {
+		return gl.leaderboards[index]
 	}
-	log.Printf("Leaderboard %v not found", boardType)
-	return nil
+	log.Printf("Leaderboard index %d not found for window %v", index, window)
+	return gl.leaderboards[0] // fallback to AllTime
 }
 
-// getCutoffTime returns the cutoff time for a given leaderboard type
-func (gl *GameLeaderboard) getCutoffTime(boardType GameLeaderboardType) time.Time {
-	if hours, exists := GlToTime[boardType]; exists && hours > 0 {
-		return time.Now().UTC().Add(-time.Duration(hours) * time.Hour)
+// getCutoffTime returns the cutoff time for a given time window
+func (gl *GameLeaderboard) getCutoffTime(window models.TimeWindow) time.Time {
+	if window.Hours > 0 {
+		return time.Now().UTC().Add(-time.Duration(window.Hours) * time.Hour)
 	}
 	return time.Time{} // AllTime has no cutoff
 }
 
-// isScoreValid checks if a score is valid for a given leaderboard type
-func (gl *GameLeaderboard) isScoreValid(boardType GameLeaderboardType, timestamp time.Time) bool {
-	if boardType == AllTime {
+// isScoreValid checks if a score is valid for a given time window
+func (gl *GameLeaderboard) isScoreValid(window models.TimeWindow, timestamp time.Time) bool {
+	if window.Hours == 0 {
 		return true
 	}
-	cutoff := gl.getCutoffTime(boardType)
+	cutoff := gl.getCutoffTime(window)
 	return timestamp.After(cutoff)
 }
 
@@ -92,8 +65,8 @@ const (
 )
 
 // withLeaderboard executes a function with a leaderboard, handling locking
-func (gl *GameLeaderboard) withLeaderboard(boardType GameLeaderboardType, lockType LockType, fn func(*LeaderBoard)) {
-	lb := gl.getLeaderboard(boardType)
+func (gl *GameLeaderboard) withLeaderboard(window models.TimeWindow, lockType LockType, fn func(*LeaderBoard)) {
+	lb := gl.getLeaderboard(window)
 	if lb == nil {
 		return
 	}
@@ -119,39 +92,30 @@ func (gl *GameLeaderboard) AddScore(userID int64, score uint64, timestamp time.T
 		Timestamp: timestamp,
 	}
 
-	for boardType := range gl.leaderboards {
-		if !gl.isScoreValid(boardType, timestamp) {
+	for _, window := range models.AllTimeWindows() {
+		if !gl.isScoreValid(window, timestamp) {
 			continue
 		}
 
-		gl.withLeaderboard(boardType, LockTypeWrite, func(lb *LeaderBoard) {
-			if existing, exists := lb.userScores[userID]; exists && existing.Score >= score {
-				return
-			}
-
-			if existing, exists := lb.userScores[userID]; exists {
-				lb.scoresList.Delete(existing)
-			}
-
-			lb.scoresList.Insert(newScore, userID)
-			lb.userScores[userID] = newScore
+		gl.withLeaderboard(window, LockTypeWrite, func(lb *LeaderBoard) {
+			// Use InsertOrUpdate to ensure user uniqueness with best score
+			lb.scoresList.InsertOrUpdate(userID, newScore)
 		})
 	}
 }
 
 // GetTopK returns the top k entries from the leaderboard
 func (gl *GameLeaderboard) GetTopK(k int, window models.TimeWindow) []models.LeaderboardEntry {
-	boardType := TimeToGl[window.Hours]
 	var result []models.LeaderboardEntry
 
-	gl.withLeaderboard(boardType, LockTypeDirtyRead, func(lb *LeaderBoard) {
+	gl.withLeaderboard(window, LockTypeDirtyRead, func(lb *LeaderBoard) {
 		entries := lb.scoresList.GetTopK(k)
 		result = make([]models.LeaderboardEntry, len(entries))
 
 		for i, entry := range entries {
 			result[i] = models.LeaderboardEntry{
-				UserID: entry.Value,
-				Score:  entry.Key.Score,
+				UserID: entry.Key,
+				Score:  entry.Value.Score,
 				Rank:   uint64(entry.Rank),
 			}
 		}
@@ -162,48 +126,66 @@ func (gl *GameLeaderboard) GetTopK(k int, window models.TimeWindow) []models.Lea
 
 // GetRankAndPercentile gets a player's rank and percentile in the leaderboard
 func (gl *GameLeaderboard) GetRankAndPercentile(userID int64, window models.TimeWindow) (uint64, float64, uint64, uint64, bool) {
-	boardType := TimeToGl[window.Hours]
 	var rank uint64
 	var percentile float64
-	var userScoreValue uint64
+	var userScore uint64
 	var total uint64
 	var found bool
 
-	gl.withLeaderboard(boardType, LockTypeDirtyRead, func(lb *LeaderBoard) {
-		userScore, exists := lb.userScores[userID]
-		if !exists {
-			return
-		}
-
-		r, rankFound := lb.scoresList.GetRank(userScore)
+	gl.withLeaderboard(window, LockTypeDirtyRead, func(lb *LeaderBoard) {
+		r, rankFound := lb.scoresList.GetRank(userID)
 		if !rankFound {
 			return
 		}
 
+		// Get the user's score
+		scoreKey, scoreFound := lb.scoresList.Search(userID)
+		if !scoreFound {
+			return
+		}
+
 		rank = uint64(r)
+		userScore = scoreKey.Score
 		total = uint64(lb.scoresList.GetLength())
 		percentile = 100.0 * float64(total-rank) / float64(total)
-		userScoreValue = userScore.Score
 		found = true
 	})
 
-	return rank, percentile, userScoreValue, total, found
+	return rank, percentile, userScore, total, found
 }
 
 // TotalPlayers returns the total number of players in the leaderboard
 func (gl *GameLeaderboard) TotalPlayers(window models.TimeWindow) uint64 {
-	boardType := TimeToGl[window.Hours]
 	var total uint64
 
-	gl.withLeaderboard(boardType, LockTypeDirtyRead, func(lb *LeaderBoard) {
+	gl.withLeaderboard(window, LockTypeDirtyRead, func(lb *LeaderBoard) {
 		total = uint64(lb.scoresList.GetLength())
 	})
 
 	return total
 }
 
-// CleanOldEntries removes entries older than the specified cutoff time
+// CleanOldEntries removes old entries from the hour-based leaderboards
 func (gl *GameLeaderboard) CleanOldEntries() {
-	// Implementation for cleaning old entries
-	// This would iterate through time-based leaderboards and remove expired entries
+	// for _, window := range models.AllTimeWindows() {
+	// 	if window == models.AllTime {
+	// 		continue // Skip all-time leaderboard
+	// 	}
+
+	// 	cutoffTime := gl.getCutoffTime(window)
+
+	// 	gl.withLeaderboard(window, LockTypeWrite, func(lb *LeaderBoard) {
+	// 		// Get all expired entries
+	// 		expiredEntries := lb.scoresList.GetAllExpiredEntries(func(score models.Score) bool {
+	// 			return score.Timestamp.Before(cutoffTime)
+	// 		})
+
+	// 		// Delete expired entries
+	// 		for _, entry := range expiredEntries {
+	// 			lb.scoresList.Delete(entry.Key)
+	// 		}
+
+	// 		log.Printf("Cleaned %d expired entries from %s leaderboard", len(expiredEntries), window.Display)
+	// 	})
+	// }
 }

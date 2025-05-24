@@ -7,37 +7,45 @@ import (
 )
 
 const (
-	MaxLevel = 16
-	P        = 0.5
+	MaxLevel = 128
+	P        = 0.25
 )
 
-type SkipListNode[K comparable, V any] struct {
+type SkipListNode[K, V comparable] struct {
 	Key     K
 	Value   V
 	Forward []*SkipListNode[K, V]
 }
 
-type CompareFunc[K comparable] func(a, b K) int
+type CompareFunc[V comparable] func(a, b V) int
 
-type SkipList[K comparable, V any] struct {
-	mu       sync.RWMutex
-	length   int
+type SkipList[K, V comparable] struct {
+	mu     sync.RWMutex
+	length int
+	level  int
+	rand   *rand.Rand
+
 	header   *SkipListNode[K, V]
-	level    int
-	keyIndex map[K]*SkipListNode[K, V]
-	rand     *rand.Rand
-	compare  CompareFunc[K]
+	mapIndex map[K]*SkipListNode[K, V]
+	compare  CompareFunc[V]
 }
 
-func NewSkipList[K comparable, V any](compareFunc CompareFunc[K]) *SkipList[K, V] {
+type Entry[K comparable, V comparable] struct {
+	Key   K
+	Value V
+	Rank  int
+}
+
+func NewSkipList[K, V comparable](compareFunc CompareFunc[V]) *SkipList[K, V] {
 	header := &SkipListNode[K, V]{
 		Forward: make([]*SkipListNode[K, V], MaxLevel),
 	}
 
 	return &SkipList[K, V]{
-		header:   header,
-		level:    1,
-		keyIndex: make(map[K]*SkipListNode[K, V]),
+		header: header,
+		level:  1,
+		// keyIndex:  make(map[K]*SkipListNode[K, V]),
+		mapIndex: make(map[K]*SkipListNode[K, V]),
 		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
 		compare:  compareFunc,
 	}
@@ -51,20 +59,34 @@ func (sl *SkipList[K, V]) randomLevel() int {
 	return level
 }
 
-func (sl *SkipList[K, V]) Insert(key K, value V) bool {
+// InsertOrUpdate inserts a new score or updates existing node's value
+func (sl *SkipList[K, V]) InsertOrUpdate(key K, value V) bool {
 	sl.mu.Lock()
 	defer sl.mu.Unlock()
 
-	if existing, exists := sl.keyIndex[key]; exists {
-		existing.Value = value
+	// Check if node already exists
+	if existingNode, nodeExists := sl.mapIndex[key]; nodeExists {
+		// Node exists, check if new score is better
+		if sl.compare(value, existingNode.Value) < 0 {
+			// New score is better, remove old entry and add new one
+			sl.deleteNode(existingNode.Key, existingNode.Value)
+			return sl.insertNode(key, value)
+		}
+		// Existing score is better or equal, don't update
 		return false
 	}
 
+	// User doesn't exist, insert new entry
+	return sl.insertNode(key, value)
+}
+
+// insertNode is the internal method to insert a node
+func (sl *SkipList[K, V]) insertNode(key K, value V) bool {
 	update := make([]*SkipListNode[K, V], MaxLevel)
 	x := sl.header
 
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, key) < 0 {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Value, value) < 0 {
 			x = x.Forward[i]
 		}
 		update[i] = x
@@ -89,27 +111,38 @@ func (sl *SkipList[K, V]) Insert(key K, value V) bool {
 		update[i].Forward[i] = newNode
 	}
 
-	sl.keyIndex[key] = newNode
+	// sl.keyIndex[key] = newNode
+	sl.mapIndex[key] = newNode
 	sl.length++
 	return true
 }
 
+// Delete removes a node by key
 func (sl *SkipList[K, V]) Delete(key K) bool {
 	sl.mu.Lock()
 	defer sl.mu.Unlock()
 
+	node, exists := sl.mapIndex[key]
+	if !exists {
+		return false
+	}
+	return sl.deleteNode(node.Key, node.Value)
+}
+
+// deleteNode is the internal method to delete a node
+func (sl *SkipList[K, V]) deleteNode(key K, value V) bool {
 	update := make([]*SkipListNode[K, V], MaxLevel)
 	x := sl.header
 
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, key) < 0 {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Value, value) < 0 {
 			x = x.Forward[i]
 		}
 		update[i] = x
 	}
 
 	x = x.Forward[0]
-	if x != nil && sl.compare(x.Key, key) == 0 {
+	if x != nil && sl.compare(x.Value, value) == 0 {
 		for i := 0; i < sl.level; i++ {
 			if update[i].Forward[i] != x {
 				break
@@ -121,7 +154,8 @@ func (sl *SkipList[K, V]) Delete(key K) bool {
 			sl.level--
 		}
 
-		delete(sl.keyIndex, key)
+		// delete(sl.keyIndex, key)
+		delete(sl.mapIndex, key)
 		sl.length--
 		return true
 	}
@@ -132,7 +166,7 @@ func (sl *SkipList[K, V]) Search(key K) (V, bool) {
 	// sl.mu.RLock()
 	// defer sl.mu.RUnlock()
 
-	node, exists := sl.keyIndex[key]
+	node, exists := sl.mapIndex[key]
 	if !exists {
 		var zero V
 		return zero, false
@@ -144,7 +178,7 @@ func (sl *SkipList[K, V]) GetRank(key K) (int, bool) {
 	// sl.mu.RLock()
 	// defer sl.mu.RUnlock()
 
-	node, exists := sl.keyIndex[key]
+	node, exists := sl.mapIndex[key]
 	if !exists {
 		return 0, false
 	}
@@ -153,19 +187,13 @@ func (sl *SkipList[K, V]) GetRank(key K) (int, bool) {
 	x := sl.header
 
 	for i := sl.level - 1; i >= 0; i-- {
-		for x.Forward[i] != nil && sl.compare(x.Forward[i].Key, node.Key) < 0 {
+		for x.Forward[i] != nil && sl.compare(x.Forward[i].Value, node.Value) < 0 {
 			rank++
 			x = x.Forward[i]
 		}
 	}
 
 	return rank, true
-}
-
-type Entry[K comparable, V any] struct {
-	Key   K
-	Value V
-	Rank  int
 }
 
 func (sl *SkipList[K, V]) GetTopK(k int) []Entry[K, V] {
@@ -208,6 +236,30 @@ func (sl *SkipList[K, V]) GetAll() []Entry[K, V] {
 	return result
 }
 
+// GetAllExpiredEntries returns entries older than the cutoff time
+func (sl *SkipList[K, V]) GetAllExpiredEntries(isExpired func(K) bool) []Entry[K, V] {
+	// sl.mu.RLock()
+	// defer sl.mu.RUnlock()
+
+	result := make([]Entry[K, V], 0)
+	x := sl.header.Forward[0]
+	rank := 1
+
+	for x != nil {
+		if isExpired(x.Key) {
+			result = append(result, Entry[K, V]{
+				Key:   x.Key,
+				Value: x.Value,
+				Rank:  rank,
+			})
+		}
+		x = x.Forward[0]
+		rank++
+	}
+
+	return result
+}
+
 func (sl *SkipList[K, V]) GetLength() int {
 	// sl.mu.RLock()
 	// defer sl.mu.RUnlock()
@@ -217,7 +269,7 @@ func (sl *SkipList[K, V]) GetLength() int {
 func (sl *SkipList[K, V]) Contains(key K) bool {
 	// sl.mu.RLock()
 	// defer sl.mu.RUnlock()
-	_, exists := sl.keyIndex[key]
+	_, exists := sl.mapIndex[key]
 	return exists
 }
 
@@ -236,5 +288,5 @@ func (sl *SkipList[K, V]) Clear() {
 	}
 	sl.level = 1
 	sl.length = 0
-	sl.keyIndex = make(map[K]*SkipListNode[K, V])
+	sl.mapIndex = make(map[K]*SkipListNode[K, V])
 }
