@@ -2,37 +2,31 @@ version: '3.8'
 
 services:
 
-  nginx:
-    image: nginx:alpine
-    container_name: leaderboard-nginx
+  traefik:
+    image: traefik:v3.4
+    container_name: traefik
     ports:
       - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-    depends_on:
-      - leaderboard-1
-      - leaderboard-2
-      - leaderboard-3
-      - leaderboard-4
-    restart: unless-stopped
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - leaderboard-network
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: unless-stopped
+    command:
+      --configFile=/etc/traefik/traefik.yml
 
-  leaderboard-1:
+  leaderboard:
     build:
       context: .
       dockerfile: Dockerfile
     expose:
-      - "8081"
+      - "8080"
     environment:
       - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8081
+      - SERVER_PORT=8080
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER:-postgres}
@@ -43,143 +37,46 @@ services:
       - KAFKA_BROKERS=kafka:9092
       - KAFKA_SCORES_TOPIC=leaderboard-scores
       - KAFKA_CONSUMER_GROUP=score-processor
-      - REPLICA_NUMBER=1
     volumes:
-      - leaderboard-data-1:/app/data
+      - leaderboard-data:/app/data
     depends_on:
       - postgres
       - kafka
     restart: unless-stopped
+    # deploy:
+    #   replicas: 4
     networks:
       - leaderboard-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8081/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leaderboard.rule=Host(`localhost`) || Host(`127.0.0.1`)"
+      - "traefik.http.routers.leaderboard.entrypoints=web"
+      - "traefik.http.services.leaderboard-service.loadbalancer.server.port=8080"
+      - "traefik.http.services.leaderboard-service.loadbalancer.sticky.cookie.name=traefik-leaderboard"
+      - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.path=/api/health"
+      - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.interval=30s"
+      - "traefik.docker.network=leaderboard-network"
 
-  leaderboard-2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    expose:
-      - "8082"
+  postgres:
+    image: postgres:17-alpine
+    container_name: leaderboard-postgres
     environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8082
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DB_NAME=leaderboard
-      - DB_SSLMODE=disable
-      - GIN_MODE=release
-      - KAFKA_BROKERS=kafka:9092
-      - KAFKA_SCORES_TOPIC=leaderboard-scores
-      - KAFKA_CONSUMER_GROUP=score-processor
-      - REPLICA_NUMBER=2
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=leaderboard
     volumes:
-      - leaderboard-data-2:/app/data
-    depends_on:
-      - postgres
-      - kafka
+      - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - leaderboard-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
+    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB' -c 'work_mem=16MB'
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8082/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  leaderboard-3:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    expose:
-      - "8083"
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8083
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DB_NAME=leaderboard
-      - DB_SSLMODE=disable
-      - GIN_MODE=release
-      - KAFKA_BROKERS=kafka:9092
-      - KAFKA_SCORES_TOPIC=leaderboard-scores
-      - KAFKA_CONSUMER_GROUP=score-processor
-      - REPLICA_NUMBER=3
-    volumes:
-      - leaderboard-data-3:/app/data
-    depends_on:
-      - postgres
-      - kafka
-    restart: unless-stopped
-    networks:
-      - leaderboard-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8083/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  leaderboard-4:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    expose:
-      - "8084"
-    environment:
-      - SERVER_HOST=0.0.0.0
-      - SERVER_PORT=8084
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - DB_NAME=leaderboard
-      - DB_SSLMODE=disable
-      - GIN_MODE=release
-      - KAFKA_BROKERS=kafka:9092
-      - KAFKA_SCORES_TOPIC=leaderboard-scores
-      - KAFKA_CONSUMER_GROUP=score-processor
-      - REPLICA_NUMBER=4
-    volumes:
-      - leaderboard-data-4:/app/data
-    depends_on:
-      - postgres
-      - kafka
-    restart: unless-stopped
-    networks:
-      - leaderboard-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8084/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "127.0.0.1:5432:5432"
 
   kafka:
     image: confluentinc/cp-kafka:latest
@@ -228,35 +125,11 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  postgres:
-    image: postgres:17-alpine
-    container_name: leaderboard-postgres
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=leaderboard
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - leaderboard-network
-    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB' -c 'work_mem=16MB'
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "127.0.0.1:5432:5432"
-
 volumes:
+  leaderboard-data:
   postgres-data:
-  leaderboard-data-1:
-  leaderboard-data-2:
-  leaderboard-data-3:
-  leaderboard-data-4:
-  zookeeper-data:
   kafka-data:
+  zookeeper-data:
 
 networks:
   leaderboard-network:

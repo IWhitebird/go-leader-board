@@ -1,0 +1,72 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: leaderboard-network
+    watch: true
+
+# Configure load balancing
+serversTransport:
+  insecureSkipVerify: true
+
+# Define services and load balancing
+http:
+  services:
+    leaderboard-service:
+      loadBalancer:
+        # Consistent distribution algorithm
+        sticky:
+          cookie:
+            name: "traefik-leaderboard"
+            secure: false
+            httpOnly: true
+        # Health check configuration
+        healthCheck:
+          path: "/api/health"
+          interval: "30s"
+          timeout: "5s"
+        # Server configuration will be auto-discovered via Docker provider
+        
+  routers:
+    leaderboard-router:
+      rule: "Host(`localhost`) || Host(`127.0.0.1`)"
+      service: leaderboard-service
+      entryPoints:
+        - web
+      middlewares:
+        - leaderboard-headers
+        
+  middlewares:
+    leaderboard-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "http"
+        customResponseHeaders:
+          X-Frame-Options: "DENY"
+          X-Content-Type-Options: "nosniff"
+
+# Logging configuration
+log:
+  level: INFO
+  
+accessLog: {}
+
+# Metrics (optional)
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true

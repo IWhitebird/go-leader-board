@@ -1,7 +1,7 @@
 -- Configuration variables
 local CONFIG = {
   min_game_id = 1,
-  max_game_id = 50,
+  max_game_id = 9,
   min_user_id = 1,
   max_user_id = 1000000000,
   min_score = 100,
@@ -24,5 +24,5 @@ function request()
                               game_id, user_id, score, timestamp)
 
   wrk.body = body
-  return wrk.format(nil, "/api/leaderboard/score")
+  return wrk.format(nil, "/api/leaderboard/score/" .. game_id)
 end

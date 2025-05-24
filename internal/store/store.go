@@ -25,12 +25,6 @@ func NewStore(db *db.PostgresRepository) *Store {
 	}
 }
 
-// NewStoreWithWAL creates a new leaderboard store with WAL
-func NewStoreWithWAL(walDir string, db *db.PostgresRepository) (*Store, error) {
-	store := NewStore(db)
-	return store, nil
-}
-
 func (ls *Store) GetOrCreateLeaderboard(gameID int64) *GameLeaderboard {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()

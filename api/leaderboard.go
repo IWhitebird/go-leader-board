@@ -153,7 +153,6 @@ func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterfac
 		if err := producer.SendScore(c.Request.Context(), score); err != nil {
 			// Log error, but don't block the request
 			log.Printf("Error sending score to Kafka: %v", err)
-
 		}
 
 		// Return success

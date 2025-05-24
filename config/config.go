@@ -58,7 +58,7 @@ func NewAppConfig() *AppConfig {
 			Brokers:       strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","),
 			ScoresTopic:   getEnv("KAFKA_SCORES_TOPIC", "leaderboard-scores"),
 			ConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "score-processor"),
-			BatchSize:     getEnvAsInt("KAFKA_BATCH_SIZE", 100),
+			BatchSize:     getEnvAsInt("KAFKA_BATCH_SIZE", 5000),
 			BatchTimeout:  getEnvAsInt("KAFKA_BATCH_TIMEOUT", 5),
 		},
 	}
