@@ -31,8 +31,8 @@ func NewKafkaConsumer(cfg *config.AppConfig, store *store.Store) (*KafkaConsumer
 		batchSize:     cfg.Kafka.BatchSize,
 		timeout:       time.Duration(cfg.Kafka.BatchTimeout) * time.Second,
 		brokers:       cfg.Kafka.Brokers,
-		topic:         cfg.Kafka.ScoresTopic,
-		consumerGroup: cfg.Kafka.ConsumerGroup,
+		topic:         cfg.Kafka.ScoresTopicPrefix,
+		consumerGroup: fmt.Sprintf("%s-%s", cfg.Kafka.ConsumerGroup, cfg.Kafka.ServiceID),
 	}
 
 	// Retry connecting to Kafka
@@ -98,12 +98,13 @@ func (c *KafkaConsumer) connect() error {
 	})
 
 	c.reader = reader
+	log.Printf("Created Kafka consumer with topic: %s, consumer group: %s", c.topic, c.consumerGroup)
 	return nil
 }
 
 // StartConsumer starts the consumer to process score messages
 func (c *KafkaConsumer) StartConsumer(ctx context.Context) {
-	log.Println("Starting Kafka consumer for scores")
+	log.Printf("Starting Kafka consumer for topic: %s", c.topic)
 
 	go func() {
 		defer c.reader.Close()
@@ -141,13 +142,13 @@ func (c *KafkaConsumer) processBatch(ctx context.Context) error {
 		case <-timer.C:
 			// Timeout reached, process the batch even if not full
 			if len(batch) > 0 {
-				return c.saveBatchToPostgres(batch)
+				return c.saveBatch(batch)
 			}
 			return nil
 		case <-ctx.Done():
 			// Context canceled, save any pending messages and exit
 			if len(batch) > 0 {
-				return c.saveBatchToPostgres(batch)
+				return c.saveBatch(batch)
 			}
 			return ctx.Err()
 		default:
@@ -187,14 +188,14 @@ func (c *KafkaConsumer) processBatch(ctx context.Context) error {
 
 	// Process full batch
 	if len(batch) > 0 {
-		return c.saveBatchToPostgres(batch)
+		return c.saveBatch(batch)
 	}
 
 	return nil
 }
 
-// saveBatchToPostgres saves a batch of scores to PostgreSQL
-func (c *KafkaConsumer) saveBatchToPostgres(batch []models.Score) error {
+// saveBatch saves a batch of scores
+func (c *KafkaConsumer) saveBatch(batch []models.Score) error {
 	if len(batch) == 0 {
 		return nil
 	}

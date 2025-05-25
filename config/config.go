@@ -1,10 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ServerConfig holds the server configuration
@@ -25,11 +27,12 @@ type DatabaseConfig struct {
 
 // KafkaConfig holds the Kafka configuration
 type KafkaConfig struct {
-	Brokers       []string
-	ScoresTopic   string
-	ConsumerGroup string
-	BatchSize     int
-	BatchTimeout  int // in seconds
+	Brokers           []string
+	ScoresTopicPrefix string // Topic name for scores
+	ConsumerGroup     string
+	BatchSize         int
+	BatchTimeout      int    // in seconds
+	ServiceID         string // Unique identifier for this service instance
 }
 
 // AppConfig holds the application configuration
@@ -55,11 +58,12 @@ func NewAppConfig() *AppConfig {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Kafka: KafkaConfig{
-			Brokers:       strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","),
-			ScoresTopic:   getEnv("KAFKA_SCORES_TOPIC", "leaderboard-scores"),
-			ConsumerGroup: getEnv("KAFKA_CONSUMER_GROUP", "score-processor"),
-			BatchSize:     getEnvAsInt("KAFKA_BATCH_SIZE", 5000),
-			BatchTimeout:  getEnvAsInt("KAFKA_BATCH_TIMEOUT", 5),
+			Brokers:           strings.Split(getEnv("KAFKA_BROKERS", "localhost:9092"), ","),
+			ScoresTopicPrefix: getEnv("KAFKA_SCORES_TOPIC_PREFIX", "leaderboard-scores"),
+			ConsumerGroup:     getEnv("KAFKA_CONSUMER_GROUP", "score-processor"),
+			BatchSize:         getEnvAsInt("KAFKA_BATCH_SIZE", 5000),
+			BatchTimeout:      getEnvAsInt("KAFKA_BATCH_TIMEOUT", 5),
+			ServiceID:         generateServiceID(),
 		},
 	}
 }
@@ -80,4 +84,20 @@ func getEnvAsInt(key string, defaultValue int) int {
 		log.Printf("Warning: Environment variable %s is not a valid integer, using default", key)
 	}
 	return defaultValue
+}
+
+// generateServiceID creates a unique service ID for this instance
+func generateServiceID() string {
+	// First try to get from environment (for Docker containers)
+	if serviceID := getEnv("SERVICE_ID", ""); serviceID != "" {
+		return serviceID
+	}
+
+	// Try to get hostname
+	if hostname, err := os.Hostname(); err == nil && hostname != "" {
+		return hostname
+	}
+
+	// Fallback to timestamp-based ID
+	return fmt.Sprintf("service-%d", time.Now().UnixNano())
 }

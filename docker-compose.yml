@@ -8,15 +8,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"  # Traefik dashboard
+      - "8080:8080" # dashboard
     volumes:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - leaderboard-network
     restart: unless-stopped
-    command:
-      --configFile=/etc/traefik/traefik.yml
+    environment:
+      - GOMAXPROCS=2
 
   leaderboard:
     build:
@@ -35,27 +35,41 @@ services:
       - DB_SSLMODE=disable
       - GIN_MODE=release
       - KAFKA_BROKERS=kafka:9092
-      - KAFKA_SCORES_TOPIC=leaderboard-scores
+      - KAFKA_SCORES_TOPIC_PREFIX=leaderboard-scores
       - KAFKA_CONSUMER_GROUP=score-processor
+      - GOMAXPROCS=1
+      - GOGC=100
+      - GOMEMLIMIT=400MiB
+      - DB_MAX_OPEN_CONNS=25
+      - DB_MAX_IDLE_CONNS=10
+      - DB_CONN_MAX_LIFETIME=300s
+      - READ_TIMEOUT=30s
+      - WRITE_TIMEOUT=30s
+      - IDLE_TIMEOUT=120s
+      - READ_HEADER_TIMEOUT=10s
     volumes:
       - leaderboard-data:/app/data
     depends_on:
       - postgres
       - kafka
     restart: unless-stopped
-    # deploy:
-    #   replicas: 4
+    deploy:
+      replicas: 6
     networks:
       - leaderboard-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.leaderboard.rule=Host(`localhost`) || Host(`127.0.0.1`)"
+      - "traefik.http.routers.leaderboard.rule=Host(`localhost`)"
       - "traefik.http.routers.leaderboard.entrypoints=web"
+      - "traefik.http.routers.leaderboard.service=leaderboard-service"
       - "traefik.http.services.leaderboard-service.loadbalancer.server.port=8080"
-      - "traefik.http.services.leaderboard-service.loadbalancer.sticky.cookie.name=traefik-leaderboard"
+      - "traefik.http.services.leaderboard-service.loadbalancer.sticky.cookie=true"
       - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.path=/api/health"
-      - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.interval=30s"
+      - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.leaderboard-service.loadbalancer.healthcheck.timeout=3s"
+      - "traefik.http.services.leaderboard-service.loadbalancer.responseforwarding.flushinterval=1ms"
       - "traefik.docker.network=leaderboard-network"
+
 
   postgres:
     image: postgres:17-alpine
@@ -94,8 +108,8 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    volumes:
-      - kafka-data:/var/lib/kafka/data
+    # volumes:
+    #   - kafka-data:/var/lib/kafka/data
     networks:
       - leaderboard-network
     healthcheck:
@@ -113,8 +127,8 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
-    volumes:
-      - zookeeper-data:/var/lib/zookeeper/data
+    # volumes:
+    #   - zookeeper-data:/var/lib/zookeeper/data
     networks:
       - leaderboard-network
     healthcheck:
@@ -128,8 +142,8 @@ services:
 volumes:
   leaderboard-data:
   postgres-data:
-  kafka-data:
-  zookeeper-data:
+  # kafka-data:
+  # zookeeper-data:
 
 networks:
   leaderboard-network:
