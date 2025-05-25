@@ -33,3 +33,4 @@ tmp/
 go.work 
 logs
 target
+test-report.html

@@ -55,9 +55,9 @@ wrk_stress:
 	@echo "Running stress test in parallel with clean output..."
 	@mkdir -p logs
 	@parallel ::: \
-		"wrk -t6 -c10000 -d5s -s ./scripts/wrk/score_post.lua http://localhost:80 > logs/score_post.txt" \
-		"wrk -t6 -c5000 -d5s -s ./scripts/wrk/get_top_leaders.lua http://localhost:80 > logs/get_top_leaders.txt" \
-		"wrk -t6 -c5000 -d5s -s ./scripts/wrk/get_user_rank.lua http://localhost:80 > logs/get_user_rank.txt"
+		"wrk -t6 -c10000 -d5s -s ./scripts/wrk/score_post.lua http://localhost:8080 > logs/score_post.txt" \
+		"wrk -t6 -c2500 -d5s -s ./scripts/wrk/get_top_leaders.lua http://localhost:8080 > logs/get_top_leaders.txt" \
+		"wrk -t6 -c2500 -d5s -s ./scripts/wrk/get_user_rank.lua http://localhost:8080 > logs/get_user_rank.txt"
 	@echo "\n\033[1;34m=== score_post.lua ===\033[0m"; cat logs/score_post.txt
 	@echo "\n\033[1;32m=== get_top_leaders.lua ===\033[0m"; cat logs/get_top_leaders.txt
 	@echo "\n\033[1;35m=== get_user_rank.lua ===\033[0m"; cat logs/get_user_rank.txt
