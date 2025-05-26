@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
 	"github.com/ringg-play/leaderboard-realtime/config"
@@ -125,7 +126,8 @@ func setupKafka(cfg *config.AppConfig, store *store.Store, ctx context.Context) 
 
 func setupRouter(store *store.Store, pgRepo *db.PostgresRepository, producer *mq.KafkaProducer) *gin.Engine {
 	router := gin.Default()
-	api.ConfigureRoutes(router, store, pgRepo, producer)
+	responseCache := persistence.NewInMemoryStore(time.Second)
+	api.ConfigureRoutes(router, store, pgRepo, producer, responseCache)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return router
 }

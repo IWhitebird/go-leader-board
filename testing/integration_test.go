@@ -39,7 +39,7 @@ func setupTestServer(t *testing.T) (*gin.Engine, *store.Store) {
 	router := gin.New()
 
 	// Configure routes
-	api.ConfigureRoutes(router, store, nil, nil)
+	api.ConfigureRoutes(router, store, nil, nil, nil)
 
 	return router, store
 }

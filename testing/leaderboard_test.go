@@ -20,7 +20,7 @@ func setupRouter() (*gin.Engine, *store.Store) {
 	router := gin.New()
 	store := store.NewStore(nil)
 
-	api.ConfigureRoutes(router, store, nil, nil)
+	api.ConfigureRoutes(router, store, nil, nil, nil)
 
 	return router, store
 }

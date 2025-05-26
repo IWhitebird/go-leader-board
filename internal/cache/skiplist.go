@@ -106,7 +106,7 @@ func (sl *SkipList[K, V]) insertNode(key K, value V) bool {
 		Forward: make([]*SkipListNode[K, V], newLevel),
 	}
 
-	for i := 0; i < newLevel; i++ {
+	for i := range newLevel {
 		newNode.Forward[i] = update[i].Forward[i]
 		update[i].Forward[i] = newNode
 	}

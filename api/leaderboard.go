@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	responseCache "github.com/gin-contrib/cache"
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/internal/db"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
@@ -26,8 +28,8 @@ import (
 // @Failure      400     {object}  map[string]string
 // @Router       /api/leaderboard/top/{gameId} [get]
 // @Example     {"game_id": 1, "user_id": 1, "score": 100, "timestamp": "2021-01-01T00:00:00Z"}
-func GetTopLeadersHandler(store *store.Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.InMemoryStore) gin.HandlerFunc {
+	return responseCache.CachePage(responseCacheStore, time.Second*10, func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
 		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
@@ -59,7 +61,7 @@ func GetTopLeadersHandler(store *store.Store) gin.HandlerFunc {
 			// TotalPlayers: totalPlayers,
 			Window: window.Display,
 		})
-	}
+	})
 }
 
 // GetPlayerRankHandler returns a handler for getting a player's rank
@@ -75,8 +77,8 @@ func GetTopLeadersHandler(store *store.Store) gin.HandlerFunc {
 // @Failure      400     {object}  map[string]string
 // @Failure      404     {object}  map[string]string
 // @Router       /api/leaderboard/rank/{gameId}/{userId} [get]
-func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.InMemoryStore) gin.HandlerFunc {
+	return responseCache.CachePage(responseCacheStore, time.Second*5, func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
 		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
@@ -115,7 +117,7 @@ func GetPlayerRankHandler(store *store.Store) gin.HandlerFunc {
 			TotalPlayers: total,
 			Window:       window.Display,
 		})
-	}
+	})
 }
 
 // SubmitScoreHandler returns a handler for submitting a score
