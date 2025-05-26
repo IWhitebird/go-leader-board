@@ -179,20 +179,33 @@ The service uses a multi-level caching approach:
 5. **Time Window Separation**: Multiple skip lists increase memory usage but improve query performance
 
 
-## Architecutre and Current faults
+## Architecture Limitations & Production Considerations
 
-This are of the thigns that are wrong with out system and also need for making this app production level.
+Here are some things that need attention to make this system truly production-ready.
 
+### Current Scaling Challenges
 
-Our current architecture doesnt allow for horizontal scaling ealityt due to in-memorty cache . we shuld seprate our cache from memeorty making our app stateless then it can easlity horizontally scaled.
+Our architecture has a fundamental limitation - the in-memory cache makes horizontal scaling tricky. The obvious fix would be to separate the cache into its own service, making our app stateless and much easier to scale horizontally.
 
-or even if we dont seperate our cache we can use game_id based load balancer so same request will hit same servers (altohugh this might not be as saclaable).
+Alternatively, we could stick with the current approach but use a game_id-based load balancer so the same requests always hit the same servers. Not as scalable, but it could work for moderate loads.
 
-we should confighure kafka in such way that to our message batch (~5000) should have all same game_id this will help with faster writes.
+### Kafka Optimization Opportunities
 
-We should shard databse on game_id basis.
+We should configure Kafka so that message batches (~5000 messages) contain scores for the same game_id. This would significantly speed up writes since we'd have better data locality.
 
-Currently our architecutrre is stroing seprate skiplist for time our window . so as time goesa this window will get dirty data that falls out of time range atleast (not for the `all` case) . we will need to handle this data time to time manually cleaning it up.
-- map [game_id] -> [all] -> ['All Skiplist']
-                    [24h] -> ['24h Skiplist']
-                    ['72hr'] -> ['72hr Skiplist']
+### Database Considerations
+
+Sharding the database by game_id would be a smart move as we scale up.
+
+### Time Window Data Management
+
+There's an interesting challenge with our time-based windows. We store separate skip lists for different time ranges, but over time these will accumulate stale data that falls outside the window (except for the "all" case). We'll need some cleanup mechanism to handle this.
+
+Our current structure looks like:
+```
+map[game_id] -> [all]  -> ['All Skiplist']
+                [24h]  -> ['24h Skiplist'] 
+                [72hr] -> ['72hr Skiplist']
+```
+
+The time-based lists will need periodic cleanup to remove expired entries.
