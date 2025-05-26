@@ -3,6 +3,8 @@ import { sleep, check } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
 import { randomIntBetween } from 'https://jslib.k6.io/k6-utils/1.2.0/index.js';
 
+const BASE_URL = 'http://localhost:8080/api';
+
 // 📊 Custom metrics
 const submitScoreCounter = new Counter('submit_score_requests');
 const getTopLeadersCounter = new Counter('get_top_leaders_requests');
@@ -67,7 +69,6 @@ export const options = {
 };
 
 // 🔗 Base URL and game/user data
-const BASE_URL = 'http://localhost:80/api';
 const GAME_IDS = Array.from({ length: 50 }, (_, i) => i + 1);
 const MAX_USER_ID = 1_000_000_000;
 

@@ -37,7 +37,7 @@ func NewKafkaProducer(cfg *config.AppConfig) (*KafkaProducer, error) {
 		Balancer: &kafka.Hash{}, // Hash balancer for distribution
 
 		// High-performance settings
-		BatchSize:    500,                   // Batch up to 500 messages
+		BatchSize:    5000,                  // Batch up to 500 messages
 		BatchBytes:   1024 * 1024,           // Batch up to 1MB
 		BatchTimeout: 50 * time.Millisecond, // Force flush every 10ms
 
@@ -62,14 +62,14 @@ func NewKafkaProducer(cfg *config.AppConfig) (*KafkaProducer, error) {
 		scoreChan:     make(chan models.Score, 2000), // Large buffer for high throughput
 		ctx:           ctx,
 		cancel:        cancel,
-		batchSize:     500,                   // Batch 500 messages at a time
+		batchSize:     5000,                  // Batch 500 messages at a time
 		flushInterval: 10 * time.Millisecond, // Flush every 10ms for low latency
 	}
 
 	// Test connection to Kafka
 	maxRetries := 5
 	var err error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if err = producer.testConnection(cfg.Kafka.Brokers); err == nil {
 			break
 		}

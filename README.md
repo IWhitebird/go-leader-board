@@ -1,164 +1,198 @@
-# Leaderboard Realtime Service
+# Go Leaderboard Service
 
-A high-performance, real-time leaderboard service built with Go, Kafka, PostgreSQL, and Redis-like in-memory caching.
+A high-performance, real-time leaderboard service built with Go, featuring Kafka-based message queuing, PostgreSQL persistence, and in-memory caching for optimal read/write performance.
 
-## Features
+## Performance Metrics
 
-- **Real-time leaderboard updates** with sub-second latency
-- **Game-specific Kafka topics** for isolated message processing
-- **High-performance in-memory caching** with multiple time windows
-- **PostgreSQL persistence** for data durability
-- **Horizontal scaling** with load balancing via Traefik
-- **Batch processing** for optimal throughput
-- **RESTful API** with Swagger documentation
+Our service delivers exceptional performance under load:
 
-## Service-Specific Processing
+![Load Test Results](assets/load_test.png)
 
-The service uses a simple but effective approach: **whoever produces a message should consume it**.
+**Single Instance Performance:**
+- **Separate Operations**: ~25k writes/sec, ~30k reads/sec
+- **Concurrent Operations**: ~13-14k writes/sec, ~10k reads/sec
 
-### How It Works
+## Architecture Overview
 
-1. **Single Topic**: All scores go to one topic: `leaderboard-scores`
-2. **Game-based Partitioning**: Messages are partitioned by game ID using the key `game-{gameID}`
-3. **Unique Consumer Groups**: Each service instance gets its own consumer group: `{consumer-group}-{serviceID}`
-4. **Load Balancing**: Kafka automatically distributes partitions across consumer instances
+The service implements a hybrid architecture optimized for high-throughput scenarios:
 
-### Benefits
+### Core Components
 
-- **Simplicity**: One topic, clear message flow
-- **Isolation**: Each service instance processes its own messages
-- **Scalability**: Kafka handles partition distribution automatically
-- **Fault Tolerance**: If one instance fails, others continue processing
+- **Kafka Message Queue**: Handles ~5,000 Scores/message queue length for high-throughput asynchronous writes
+- **PostgreSQL**: Primary persistent storage with optimized indexes
+- **In-Memory Cache**: Skip list implementation for ultra-fast lookups and ranking operations
+- **Real-time Updates**: Automatic cache synchronization with database changes
 
-### Configuration
+### Data Flow
 
-Set these environment variables:
+**Write Operations**: Client → Kafka → PostgreSQL → In-Memory Cache Update
 
-```bash
-KAFKA_SCORES_TOPIC_PREFIX=leaderboard-scores  # Topic name for scores
-KAFKA_CONSUMER_GROUP=score-processor          # Base consumer group name
-```
+**Read Operations**: Client → In-Memory Cache (Skip List) → Response
 
-The service automatically generates unique consumer groups per instance using hostname or timestamp.
+## Prerequisites
+
+### Production Deployment
+- Docker & Docker Compose
+
+### Local Development
+- Go 1.24+
+- Docker & Docker Compose
+- wrk or k6 (for load testing)
 
 ## Quick Start
 
-### Using Docker Compose
+### 1. Clone and Configure
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# Scale leaderboard service to 4 instances
-docker-compose up -d --scale leaderboard=4
-
-# View logs
-docker-compose logs -f leaderboard
+git clone https://github.com/iwhitebird/go-leader-board
+cd go-leader-board
+cp .env.example .env
+# Configure .env according to your requirements
 ```
 
-### API Endpoints
+### 2. Running the service
 
-- `POST /api/leaderboard/score/{gameId}` - Submit a score
-- `GET /api/leaderboard/top/{gameId}` - Get top players
-- `GET /api/leaderboard/rank/{gameId}/{userId}` - Get player rank
-- `GET /api/health` - Health check
+Direct using docker
+
+```bash
+docker compose up -d
+```
+
+#### Or
+
+Running server Locally  
+
+Start dependencies:
+```bash
+docker compose up postgres kafka -d
+```
+
+Install dependencies and run:
+```bash
+go mod download
+```
+Optionally generate documentation
+
+```bash
+make swagger-docs
+```
+
+build and run the service 
+
+```bash
+make run
+```
+
+For development with hot reload:
+```bash
+# Ensure go-air is installed
+air
+```
+
+## API Reference
+
+### Endpoints
+
+| Method | Endpoint | Description | Complexity |
+|--------|----------|-------------|------------|
+| `GET` | `/api/health` | Health check | O(1) |
+| `POST` | `/api/leaderboard/score/{gameId}` | Submit player score | O(log n) |
+| `GET` | `/api/leaderboard/top/{gameId}` | Get top players | O(k) |
+| `GET` | `/api/leaderboard/rank/{gameId}/{userId}` | Get player rank | O(log n) |
+
+### Query Parameters
+
+The leaderboard endpoints support an optional `window` parameter:
+- `24h` - Last 24 hours
+- `3d` - Last 3 days  
+- `7d` - Last 7 days
+- Default: All time
 
 ### API Documentation
 
-Visit `http://localhost/swagger/index.html` for interactive API documentation.
+Interactive API documentation is available at `http://localhost/swagger/index.html`
 
-## Architecture
+## Load Testing
 
-```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│   Client    │───▶│   Traefik    │───▶│ Leaderboard │
-└─────────────┘    │ Load Balancer│    │  Service    │
-                   └──────────────┘    │ (8 replicas)│
-                                       └─────────────┘
-                                              │
-                   ┌─────────────────────────────────────┐
-                   │                                     │
-                   ▼                                     ▼
-            ┌─────────────┐                    ┌─────────────┐
-            │    Kafka    │                    │ PostgreSQL  │
-            │Single Topic │                    │  Database   │
-            │(Partitioned)│                    │             │
-            └─────────────┘                    └─────────────┘
-```
-
-## Performance
-
-- **Throughput**: 50,000+ requests/second
-- **Latency**: Sub-millisecond for cached queries
-- **Batch Processing**: 500 messages per batch, 10ms flush interval
-- **Memory Usage**: Optimized skip-list data structures
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SERVER_HOST` | `127.0.0.1` | Server bind address |
-| `SERVER_PORT` | `8080` | Server port |
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_USER` | `postgres` | PostgreSQL username |
-| `DB_PASSWORD` | `postgres` | PostgreSQL password |
-| `DB_NAME` | `leaderboard` | PostgreSQL database name |
-| `KAFKA_BROKERS` | `localhost:9092` | Kafka broker addresses |
-| `KAFKA_SCORES_TOPIC_PREFIX` | `leaderboard-scores` | Topic name for scores |
-| `KAFKA_CONSUMER_GROUP` | `score-processor` | Base consumer group |
-| `KAFKA_BATCH_SIZE` | `5000` | Consumer batch size |
-| `KAFKA_BATCH_TIMEOUT` | `5` | Consumer batch timeout (seconds) |
-
-## Development
-
-### Prerequisites
-
-- Go 1.24+
-- Docker & Docker Compose
-- PostgreSQL 17+
-- Kafka 2.8+
-
-### Local Development
+### Using wrk
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd leaderboard-realtime
+sudo apt-get install wrk parallel
 
-# Install dependencies
-go mod download
+# Combined read/write stress test
+make wrk_stress
 
-# Run tests
-go test ./...
-
-# Build
-go build -o leaderboard ./cmd/leaderboard
-
-# Run locally (requires PostgreSQL and Kafka)
-./leaderboard
+# Individual tests
+make wrk_read_stress
+make wrk_write_stress
 ```
 
-### Load Testing
+### Using k6 (Not recommended)
 
 ```bash
-# Install wrk
-sudo apt-get install wrk
-
-# Test score submission
-wrk -t12 -c400 -d30s -s scripts/wrk/score_post.lua http://localhost/api
-
-# Test leaderboard queries
-wrk -t12 -c400 -d30s -s scripts/wrk/get_top_leaders.lua http://localhost/api
+make k6_stress
 ```
 
-## Monitoring
+## Technical Implementation
 
-- **Health Check**: `GET /api/health`
-- **Metrics**: Kafka producer/consumer metrics logged every 30 seconds
-- **Logs**: Structured logging with request tracing
+### Caching Strategy
 
-## License
+The service uses a multi-level caching approach:
 
-MIT License
+1. **Skip List Cache**: O(log n) insertions and lookups
+2. **User Rank Mapping**: O(1) rank and percentile queries
+3. **Request Caching**: Reduces repeated query overhead
+4. **Time-based Partitioning**: Separate skip lists for different time windows
 
+### Data Consistency
+
+- **Write Path**: Eventual consistency through Kafka
+- **Durability**: PostgreSQL ensures data persistence
+- **Availability**: On startup service fetches data from postgres and keeps re-create cache's parallely for faster performance.
+
+### Optimizations
+
+- **Batch Processing**: Kafka enables efficient batch writes
+- **Connection Pooling**: We are using pool of connecitons for faster and parallel writes to database.
+- **Channel Queuing**: Go channels buffer Kafka messages for improved throughput
+- **Concurrent Processing**: Lock-free dirty-reads with minimal write contention
+- **Index Optimization**: PostgreSQL indexes on frequently queried fields
+
+## Future Enhancements & Notes
+
+### Scalability Improvements
+- **Load Balancer**: Consistent hashing for multi-node deployment
+- **Stateless Design**: External cache service for horizontal scaling
+- **Database Sharding**: CockroachDB with game_id partitioning
+- **Kafka Partitioning**: Topic partitioning by game_id for reduced lock contention
+
+### Performance Optimizations
+- **Compression**: Message compression for reduced network overhead
+- **Monitoring**: Comprehensive metrics and alerting
+
+## Trade-offs and Design Decisions
+
+1. **Eventual Consistency**: Prioritizes write performance over immediate consistency
+2. **Memory Usage**: In-memory caching trades memory for read performance
+3. **Dirty Reads**: Accepts potential read inconsistency for higher throughput
+4. **Channel Buffering with batch writes to kafka**: Improves performance but introduces potential message loss risk
+5. **Time Window Separation**: Multiple skip lists increase memory usage but improve query performance
+
+
+## Architecutre and Current faults
+
+This are of the thigns that are wrong with out system and also need for making this app production level.
+
+
+Our current architecture doesnt allow for horizontal scaling ealityt due to in-memorty cache . we shuld seprate our cache from memeorty making our app stateless then it can easlity horizontally scaled.
+
+or even if we dont seperate our cache we can use game_id based load balancer so same request will hit same servers (altohugh this might not be as saclaable).
+
+we should confighure kafka in such way that to our message batch (~5000) should have all same game_id this will help with faster writes.
+
+We should shard databse on game_id basis.
+
+Currently our architecutrre is stroing seprate skiplist for time our window . so as time goesa this window will get dirty data that falls out of time range atleast (not for the `all` case) . we will need to handle this data time to time manually cleaning it up.
+- map [game_id] -> [all] -> ['All Skiplist']
+                    [24h] -> ['24h Skiplist']
+                    ['72hr'] -> ['72hr Skiplist']

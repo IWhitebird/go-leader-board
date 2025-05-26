@@ -1,4 +1,4 @@
-.PHONY: build run dev clean test swagger-docs k6_stress wrk_stress
+.PHONY: build run dev clean test swagger-docs k6_stress wrk_stress wrk_read_stress wrk_write_stress
 
 # Go build flags
 CUR_DIR = $(shell pwd)
@@ -51,6 +51,7 @@ k6_stress:
 	@echo "Running stress test..."
 	@k6 run --out dashboard=export=./scripts/k6/test-report.html ./scripts/k6/k6-loadtest.js
 
+
 wrk_stress:
 	@echo "Running stress test in parallel with clean output..."
 	@mkdir -p logs
@@ -61,3 +62,19 @@ wrk_stress:
 	@echo "\n\033[1;34m=== score_post.lua ===\033[0m"; cat logs/score_post.txt
 	@echo "\n\033[1;32m=== get_top_leaders.lua ===\033[0m"; cat logs/get_top_leaders.txt
 	@echo "\n\033[1;35m=== get_user_rank.lua ===\033[0m"; cat logs/get_user_rank.txt
+
+wrk_read_stress:
+	@echo "Running read stress test in parallel with clean output..."
+	@mkdir -p logs
+	@parallel ::: \
+		"wrk -t6 -c2500 -d5s -s ./scripts/wrk/get_top_leaders.lua http://localhost:8080 > logs/get_top_leaders.txt" \
+		"wrk -t6 -c2500 -d5s -s ./scripts/wrk/get_user_rank.lua http://localhost:8080 > logs/get_user_rank.txt"
+	@echo "\n\033[1;32m=== get_top_leaders.lua ===\033[0m"; cat logs/get_top_leaders.txt
+	@echo "\n\033[1;35m=== get_user_rank.lua ===\033[0m"; cat logs/get_user_rank.txt
+
+wrk_write_stress:
+	@echo "Running write stress test in parallel with clean output..."
+	@mkdir -p logs
+	@parallel ::: \
+		"wrk -t6 -c10000 -d30s -s ./scripts/wrk/score_post.lua http://localhost:8080 > logs/score_post.txt"
+	@echo "\n\033[1;34m=== score_post.lua ===\033[0m"; cat logs/score_post.txt

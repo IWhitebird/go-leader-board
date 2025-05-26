@@ -30,6 +30,6 @@ func ConfigureRoutes(
 		leaderboard.GET("/rank/:gameId/:userId", GetPlayerRankHandler(store, responseCache))
 
 		// Submit a score
-		leaderboard.POST("/score/:gameId", SubmitScoreHandler(store, pgRepo, producer))
+		leaderboard.POST("/score", SubmitScoreHandler(store, pgRepo, producer))
 	}
 }

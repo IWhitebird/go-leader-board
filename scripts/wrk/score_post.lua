@@ -39,6 +39,6 @@ function request()
   local body = string.format('{"game_id":%d,"user_id":%d,"score":%d,"timestamp":"%s"}',
                               game_id, user_id, score, timestamp)
   wrk.body = body
-  local path = string.format("/api/leaderboard/score/%d", game_id)
+  local path = string.format("/api/leaderboard/score")
   return wrk.format("POST", path)
 end

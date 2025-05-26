@@ -27,9 +27,8 @@ import (
 // @Success      200     {object}  models.TopLeadersResponse
 // @Failure      400     {object}  map[string]string
 // @Router       /api/leaderboard/top/{gameId} [get]
-// @Example     {"game_id": 1, "user_id": 1, "score": 100, "timestamp": "2021-01-01T00:00:00Z"}
 func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.InMemoryStore) gin.HandlerFunc {
-	return responseCache.CachePage(responseCacheStore, time.Second*10, func(c *gin.Context) {
+	return responseCache.CachePage(responseCacheStore, time.Second*5, func(c *gin.Context) {
 		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
 		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
@@ -126,11 +125,10 @@ func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.In
 // @Tags         leaderboard
 // @Accept       json
 // @Produce      json
-// @Param        gameId  path      int  true  "Game ID"
 // @Param        score   body      models.Score  true  "Score data"
 // @Success      200
 // @Failure      400     {object}  map[string]string
-// @Router       /api/leaderboard/score/{gameId} [post]
+// @Router       /api/leaderboard/score [post]
 func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse score from request body
