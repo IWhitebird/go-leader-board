@@ -6,12 +6,15 @@ A high-performance, real-time leaderboard service built with Go, featuring Kafka
 
 Our service delivers exceptional performance under load:
 
-This example running 2 read and 1 write api concurrently.
+This test running 2 read and 1 write api concurrently and was performed running the wrk locally and everything else in docker.
+
 ![Load Test Results](assets/load_test.png)
 
 **Single Instance Performance:**
-- **Separate Operations**: ~25k writes/sec, ~30k reads/sec
-- **Concurrent Operations**: ~13-14k writes/sec, ~10k reads/sec
+- **Separate Operations**: ~25k+ writes/sec, ~30k+ reads/sec
+- **Concurrent Operations**: ~15k+ writes/sec, ~13k+ reads/sec
+
+
 
 ## Architecture Overview
 
@@ -53,24 +56,24 @@ cp .env.example .env
 
 ### 2. Running the service
 
-Direct using docker
+Direct using docker (Recommended)
 
 ```bash
-docker compose up -d
+make prod_infra_up
 ```
 
 #### Or
 
-Running server Locally  
+Running infra on docker and server Locally.
 
 Start database and kafka:
 ```bash
-docker compose up postgres kafka -d
+make local_infra_up
 ```
 
 Install dependencies and run:
 ```bash
-go mod download
+go mod tidy #or go mod download
 ```
 Optionally generate documentation
 
@@ -81,13 +84,7 @@ make swagger-docs
 build and run the service 
 
 ```bash
-make run
-```
-
-For development with hot reload:
-```bash
-# Ensure go-air is installed
-air
+make run # Or with ""air" if you have go-air installed
 ```
 
 ## API Reference
@@ -97,7 +94,7 @@ air
 | Method | Endpoint | Description | Complexity |
 |--------|----------|-------------|------------|
 | `GET` | `/api/health` | Health check | O(1) |
-| `POST` | `/api/leaderboard/score/{gameId}` | Submit player score | O(log n) |
+| `POST` | `/api/leaderboard/score` | Submit player score | O(log n) |
 | `GET` | `/api/leaderboard/top/{gameId}` | Get top players | O(k) |
 | `GET` | `/api/leaderboard/rank/{gameId}/{userId}` | Get player rank | O(log n) |
 
@@ -126,12 +123,11 @@ make wrk_stress
 # Individual tests
 make wrk_read_stress
 make wrk_write_stress
-```
 
-### Using k6 (Not recommended)
-
-```bash
-make k6_stress
+#I have also provided the wrk docker for testing not recommended it uses docker internal gateway which is slow.
+#make docker_wrk_stress:
+#make docker_wrk_read_stress
+#make docker_wrk_write_stress
 ```
 
 ## Technical Implementation
@@ -140,10 +136,9 @@ make k6_stress
 
 The service uses a multi-level caching approach:
 
-1. **Skip List Cache**: O(log n) insertions and lookups
-2. **User Rank Mapping**: O(1) rank and percentile queries
-3. **Request Caching**: Reduces repeated query overhead
-4. **Time-based Partitioning**: Separate skip lists for different time windows
+1. **Skip List with map for Cache**: O(log n) insertions and lookups
+2. **Request Caching**: Reduces repeated query overhead
+3. **Time-based Partitioning**: Separate skip lists for different time windows
 
 ### Data Consistency
 
@@ -163,13 +158,9 @@ The service uses a multi-level caching approach:
 
 ### Scalability Improvements
 - **Load Balancer**: Consistent hashing for multi-node deployment
-- **Stateless Design**: External cache service for horizontal scaling
-- **Database Sharding**: CockroachDB with game_id partitioning
-- **Kafka Partitioning**: Topic partitioning by game_id for reduced lock contention
-
-### Performance Optimizations
-- **Compression**: Message compression for reduced network overhead
-- **Monitoring**: Comprehensive metrics and alerting
+- **Stateless Design**: External cache service for stateless horizontal scaling
+- **Database Sharding**: Sharding db with something like CockroachDB with game_id 
+- **Kafka Partitioning**: Topic partitioning by game_id for reduced lock contention while writing to db and updating cache.
 
 ## Trade-offs and Design Decisions
 
@@ -186,9 +177,9 @@ Here are some things that need attention to make this system truly production-re
 
 ### Current Scaling Challenges
 
-Our architecture has a fundamental limitation - the in-memory cache makes horizontal scaling tricky. The obvious fix would be to separate the cache into its own service, making our app stateless and much easier to scale horizontally.
+Our architecture has a fundamental limitation - the in-memory cache makes horizontal scaling tricky. The obvious fix would be to separate the cache into its own service, making our app stateless and much easier to scale horizontally. This will add network overhead.
 
-Alternatively, we could stick with the current approach but use a game_id-based load balancer so the same requests always hit the same servers. Not as scalable, but it could work for moderate loads.
+Alternatively, we could stick with the current approach but use a game_id-based load balancer so the same requests always hit the same servers. Not as scalable, but it could work for moderate loads. but this complicates our load balancer and doesn't scale well with consistant hashing.
 
 ### Kafka Optimization Opportunities
 
@@ -196,7 +187,7 @@ We should configure Kafka so that message batches (~5000 messages) contain score
 
 ### Database Considerations
 
-Sharding the database by game_id using cockroachdb would increase our startup latences and eventual writes.
+Sharding the database by game_id using cockroachdb would increase our startup latences and eventual writes. or use write heavy databases with direct partitioning support like scylladb or cassandra.
 
 ### Time Window Data Management
 

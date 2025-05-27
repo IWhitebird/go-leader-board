@@ -173,11 +173,11 @@ func (c *KafkaConsumer) processBatch(ctx context.Context) error {
 }
 
 func (c *KafkaConsumer) saveBatch(batch []models.Score) error {
+	logging.Info("Saving batch of scores", "count", len(batch))
+
 	if len(batch) == 0 {
 		return nil
 	}
-
-	logging.Info("Saving batch of scores", "count", len(batch))
 
 	if err := c.store.SaveScoreBatch(batch); err != nil {
 		logging.Error("Error saving batch", "error", err)

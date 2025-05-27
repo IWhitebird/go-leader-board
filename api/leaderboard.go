@@ -145,12 +145,6 @@ func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterfac
 			return
 		}
 
-		if err := store.AddScore(score); err != nil {
-			logging.Error("Error adding score to store:", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save score"})
-			return
-		}
-
 		if producer != nil {
 			if err := producer.SendScore(c.Request.Context(), score); err != nil {
 				logging.Error("Error sending score to Kafka:", err)

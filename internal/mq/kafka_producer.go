@@ -33,8 +33,8 @@ func NewKafkaProducer(cfg *config.AppConfig) (*KafkaProducer, error) {
 		Topic:        cfg.Kafka.ScoresTopicPrefix,
 		Balancer:     &kafka.Hash{},
 		BatchSize:    5000,
-		BatchBytes:   1024 * 1024,
-		BatchTimeout: 50 * time.Millisecond,
+		BatchBytes:   1024 * 1024 * 2,
+		BatchTimeout: 500 * time.Millisecond,
 		RequiredAcks: kafka.RequireOne,
 		Async:        true,
 		WriteTimeout: 30 * time.Second,
@@ -46,11 +46,11 @@ func NewKafkaProducer(cfg *config.AppConfig) (*KafkaProducer, error) {
 	producer := &KafkaProducer{
 		writer:        writer,
 		connected:     false,
-		scoreChan:     make(chan models.Score, 2000),
+		scoreChan:     make(chan models.Score, 20000),
 		ctx:           ctx,
 		cancel:        cancel,
 		batchSize:     5000,
-		flushInterval: 10 * time.Millisecond,
+		flushInterval: 1 * time.Second,
 	}
 
 	maxRetries := 5

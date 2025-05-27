@@ -1,4 +1,23 @@
-.PHONY: build run dev clean test swagger-docs k6_stress wrk_stress wrk_read_stress wrk_write_stress
+.PHONY: \
+	build \
+	run \
+	dev \
+	clean \
+	test \
+	swagger-docs \
+	k6_stress \
+	wrk_stress \
+	wrk_read_stress \
+	wrk_write_stress \
+	docker_wrk_stress \
+	docker_wrk_read_stress \
+	docker_wrk_write_stress \
+	docker_wrk_up \
+	docker_wrk_down \
+	local_infra_up \
+	local_infra_down \
+	prod_infra_up \
+	prod_infra_down
 
 # Go build flags
 CUR_DIR = $(shell pwd)
@@ -9,39 +28,38 @@ BUILD_DIR ?= ./bin
 # Application info
 APP_NAME = leaderboard-service
 
+# Local
+
 dev:
 	@echo "Starting development server with hot reload..."
 	@air
 
-# Build the application
 build:
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	@go build -o $(BUILD_DIR)/$(APP_NAME) ./cmd/leaderboard
 
-# Run the application
 run: build
 	@echo "Running $(APP_NAME)..."
 	@$(BUILD_DIR)/$(APP_NAME)
 
 
-# Clean build artifacts
 clean:
 	@echo "Cleaning..."
 	@rm -rf $(BUILD_DIR)
 	@rm -rf tmp
 	@rm -rf docs
 
-# Run tests
 test:
 	@echo "Running tests..."
 	@go test -v ./...
 
-# Generate Swagger documentation
 swagger-docs:
 	@echo "Generating Swagger documentation..."
 	@swag init -g ./cmd/leaderboard/main.go -o ./docs
 
+
+# Local Stress Tests
 
 k6_stress:
 	@echo "Running stress test..."
@@ -74,3 +92,42 @@ wrk_write_stress:
 	@parallel ::: \
 		"wrk -t6 -c10000 -d30s -s ./scripts/wrk/score_post.lua http://localhost:8080 > logs/score_post.txt"
 	@echo "\n\033[1;34m=== score_post.lua ===\033[0m"; cat logs/score_post.txt
+
+
+# Docker
+
+local_infra_up:
+	@echo "Starting local infrastructure..."
+	@docker compose -f docker/local/docker-compose.yml up -d
+
+local_infra_down:
+	@echo "Stopping local infrastructure..."
+	@docker compose -f docker/local/docker-compose.yml down
+
+prod_infra_up:
+	@echo "Starting production infrastructure..."
+	@docker compose -f docker/prod/docker-compose.yml up -d
+
+prod_infra_down:
+	@echo "Stopping production infrastructure..."
+	@docker compose -f docker/prod/docker-compose.yml down
+
+# Docker Stress Tests
+
+docker_wrk_stress:
+	@echo "Running Docker WRK stress test..."
+	@docker compose -f docker-compose.stress.yml up -d
+	@docker compose -f docker-compose.stress.yml exec wrk-tester ./docker-wrk-stress.sh stress
+	@docker compose -f docker-compose.stress.yml down
+
+docker_wrk_read_stress:
+	@echo "Running Docker WRK read stress test..."
+	@docker compose -f docker-compose.stress.yml up -d
+	@docker compose -f docker-compose.stress.yml exec wrk-tester ./docker-wrk-stress.sh read
+	@docker compose -f docker-compose.stress.yml down
+
+docker_wrk_write_stress:
+	@echo "Running Docker WRK write stress test..."
+	@docker compose -f docker-compose.stress.yml up -d
+	@docker compose -f docker-compose.stress.yml exec wrk-tester ./docker-wrk-stress.sh write
+	@docker compose -f docker-compose.stress.yml down
