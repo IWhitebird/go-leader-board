@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // ServerConfig holds the server configuration
@@ -44,6 +46,10 @@ type AppConfig struct {
 
 // NewAppConfig creates a new AppConfig from environment variables
 func NewAppConfig() *AppConfig {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Error loading .env file")
+	}
 	return &AppConfig{
 		Server: ServerConfig{
 			Host: getEnv("SERVER_HOST", "127.0.0.1"),
