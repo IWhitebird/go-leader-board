@@ -1,11 +1,11 @@
 package api
 
 import (
+	"github.com/IWhitebird/go-leader-board/internal/db"
+	"github.com/IWhitebird/go-leader-board/internal/mq"
+	"github.com/IWhitebird/go-leader-board/internal/store"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
-	"github.com/ringg-play/leaderboard-realtime/internal/mq"
-	"github.com/ringg-play/leaderboard-realtime/internal/store"
 )
 
 func ConfigureRoutes(

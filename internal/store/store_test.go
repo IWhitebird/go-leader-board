@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/IWhitebird/go-leader-board/internal/models"
 )
 
 func TestGameLeaderboard_GetTopK(t *testing.T) {

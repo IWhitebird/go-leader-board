@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/IWhitebird/go-leader-board/api"
+	"github.com/IWhitebird/go-leader-board/internal/models"
+	"github.com/IWhitebird/go-leader-board/internal/store"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/api"
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
-	"github.com/ringg-play/leaderboard-realtime/internal/store"
 	"github.com/stretchr/testify/assert"
 )
 

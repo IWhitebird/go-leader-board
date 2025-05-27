@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/IWhitebird/go-leader-board/config"
+	"github.com/IWhitebird/go-leader-board/internal/models"
 	_ "github.com/lib/pq"
-	"github.com/ringg-play/leaderboard-realtime/config"
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 //go:embed sql/init.sql

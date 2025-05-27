@@ -1,6 +1,6 @@
 package test
 
-import "github.com/ringg-play/leaderboard-realtime/internal/models"
+import "github.com/IWhitebird/go-leader-board/internal/models"
 
 // Mock PostgreSQL repository for testing
 type mockPgRepo struct{}

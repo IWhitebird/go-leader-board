@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/IWhitebird/go-leader-board/internal/models"
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
 // HealthHandler returns a handler for the health endpoint

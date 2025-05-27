@@ -1,6 +1,6 @@
-module github.com/ringg-play/leaderboard-realtime
+module github.com/IWhitebird/go-leader-board
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 

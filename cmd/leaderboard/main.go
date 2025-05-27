@@ -11,16 +11,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IWhitebird/go-leader-board/api"
+	"github.com/IWhitebird/go-leader-board/config"
+	"github.com/IWhitebird/go-leader-board/internal/db"
+	"github.com/IWhitebird/go-leader-board/internal/logging"
+	"github.com/IWhitebird/go-leader-board/internal/mq"
+	"github.com/IWhitebird/go-leader-board/internal/store"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/api"
-	"github.com/ringg-play/leaderboard-realtime/config"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
-	"github.com/ringg-play/leaderboard-realtime/internal/logging"
-	"github.com/ringg-play/leaderboard-realtime/internal/mq"
-	"github.com/ringg-play/leaderboard-realtime/internal/store"
 
-	_ "github.com/ringg-play/leaderboard-realtime/docs"
+	_ "github.com/IWhitebird/go-leader-board/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )

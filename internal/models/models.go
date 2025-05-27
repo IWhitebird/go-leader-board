@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/internal/logging"
+	"github.com/IWhitebird/go-leader-board/internal/logging"
 )
 
 type HealthResponse struct {

@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
-	cache "github.com/ringg-play/leaderboard-realtime/internal/cache"
-	"github.com/ringg-play/leaderboard-realtime/internal/logging"
-	models "github.com/ringg-play/leaderboard-realtime/internal/models"
+	cache "github.com/IWhitebird/go-leader-board/internal/cache"
+	"github.com/IWhitebird/go-leader-board/internal/logging"
+	models "github.com/IWhitebird/go-leader-board/internal/models"
 )
 
 type LeaderBoard struct {

@@ -5,14 +5,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/IWhitebird/go-leader-board/internal/db"
+	"github.com/IWhitebird/go-leader-board/internal/logging"
+	"github.com/IWhitebird/go-leader-board/internal/models"
+	"github.com/IWhitebird/go-leader-board/internal/mq"
+	"github.com/IWhitebird/go-leader-board/internal/store"
 	responseCache "github.com/gin-contrib/cache"
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
-	"github.com/ringg-play/leaderboard-realtime/internal/db"
-	"github.com/ringg-play/leaderboard-realtime/internal/logging"
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
-	"github.com/ringg-play/leaderboard-realtime/internal/mq"
-	"github.com/ringg-play/leaderboard-realtime/internal/store"
 )
 
 // GetTopLeadersHandler returns a handler for getting top leaders

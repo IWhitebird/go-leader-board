@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ringg-play/leaderboard-realtime/config"
-	"github.com/ringg-play/leaderboard-realtime/internal/logging"
-	"github.com/ringg-play/leaderboard-realtime/internal/models"
+	"github.com/IWhitebird/go-leader-board/config"
+	"github.com/IWhitebird/go-leader-board/internal/logging"
+	"github.com/IWhitebird/go-leader-board/internal/models"
 	"github.com/segmentio/kafka-go"
 )
 
