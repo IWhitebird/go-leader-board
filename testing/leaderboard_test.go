@@ -105,7 +105,7 @@ func TestGetPlayerRankHandler(t *testing.T) {
 	assert.Equal(t, int64(2), response.UserID)
 	assert.Equal(t, uint64(200), response.Score)
 	assert.Equal(t, uint64(1), response.Rank)
-	assert.InDelta(t, 66.67, response.Percentile, 0.1)
+	assert.InDelta(t, 100.0, response.Percentile, 0.1)
 
 	// Test with time window
 	w = httptest.NewRecorder()

@@ -49,7 +49,7 @@ func TestGameLeaderboard_GetRankAndPercentile(t *testing.T) {
 	assert.Equal(t, uint64(3), rank)
 	assert.Equal(t, uint64(100), score)
 	assert.Equal(t, uint64(4), total)
-	assert.InDelta(t, 25.0, percentile, 0.1) // (4-3)/4 * 100 = 25%
+	assert.InDelta(t, 50.0, percentile, 0.1) // (4-3+1)/4 * 100 = 50%
 
 	// Test rank and percentile for user 2 (top)
 	rank, percentile, score, total, exists = gl.GetRankAndPercentile(2, models.AllTime)
@@ -57,7 +57,7 @@ func TestGameLeaderboard_GetRankAndPercentile(t *testing.T) {
 	assert.Equal(t, uint64(1), rank)
 	assert.Equal(t, uint64(300), score)
 	assert.Equal(t, uint64(4), total)
-	assert.InDelta(t, 75.0, percentile, 0.1) // (4-1)/4 * 100 = 75%
+	assert.InDelta(t, 100.0, percentile, 0.1) // (4-1+1)/4 * 100 = 100%
 
 	// Test non-existent user
 	_, _, _, _, exists = gl.GetRankAndPercentile(99, models.AllTime)
@@ -94,7 +94,7 @@ func TestLeaderboardStore(t *testing.T) {
 	assert.Equal(t, uint64(2), rank)
 	assert.Equal(t, uint64(100), score)
 	assert.Equal(t, uint64(2), total)
-	assert.InDelta(t, 0.0, percentile, 0.1) // (2-2)/2 * 100 = 0%
+	assert.InDelta(t, 50.0, percentile, 0.1) // (2-2+1)/2 * 100 = 50%
 
 	// Test total players
 	assert.Equal(t, uint64(2), store.TotalPlayers(1))

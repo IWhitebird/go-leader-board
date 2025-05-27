@@ -111,7 +111,7 @@ func TestFullScenario(t *testing.T) {
 	assert.Equal(t, uint64(300), rankResponse.Score)
 	assert.Equal(t, uint64(3), rankResponse.Rank)
 	assert.Equal(t, uint64(5), rankResponse.TotalPlayers)
-	assert.InDelta(t, 40.0, rankResponse.Percentile, 0.1) // (5-3)/5 * 100 = 40%
+	assert.InDelta(t, 60.0, rankResponse.Percentile, 0.1) // (5-3+1)/5 * 100 = 60%
 
 	// 4. Submit a higher score for an existing user
 	updatedScore := models.Score{

@@ -142,7 +142,7 @@ func (gl *GameLeaderboard) GetRankAndPercentile(userID int64, window models.Time
 		rank = uint64(r)
 		userScore = scoreKey.Score
 		total = uint64(lb.scoresList.GetLength())
-		percentile = 100.0 * float64(total-rank) / float64(total)
+		percentile = 100.0 * float64(total-rank+1) / float64(total)
 		found = true
 	})
 
