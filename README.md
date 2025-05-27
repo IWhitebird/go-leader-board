@@ -10,12 +10,6 @@ This test running 2 read and 1 write api concurrently and was performed running 
 
 ![Load Test Results](assets/load_test.png)
 
-**Single Instance Performance:**
-- **Separate Operations**: ~25k+ writes/sec, ~30k+ reads/sec
-- **Concurrent Operations**: ~15k+ writes/sec, ~13k+ reads/sec
-
-
-
 ## Architecture Overview
 
 The service implements a hybrid architecture optimized for high-throughput scenarios:
