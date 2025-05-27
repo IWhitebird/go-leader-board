@@ -206,3 +206,54 @@ func TestSkipList_GetAll(t *testing.T) {
 	assert.Equal(t, 300, all[2].Value)
 	assert.Equal(t, 3, all[2].Rank)
 }
+
+func TestSkipList_GetRank(t *testing.T) {
+	sl := NewSkipList[int, int](func(a, b int) int {
+		if a > b {
+			return -1
+		} else if a < b {
+			return 1
+		}
+		return 0
+	})
+
+	// Insert values in random order
+	values := []int{50, 100, 25, 75, 10, 90, 30}
+	for i, val := range values {
+		sl.InsertOrUpdate(i, val)
+	}
+
+	// Test ranks (sorted order should be: 100, 90, 75, 50, 30, 25, 10)
+	rank, found := sl.GetRank(1) // value 100
+	assert.True(t, found)
+	assert.Equal(t, 1, rank)
+
+	rank, found = sl.GetRank(5) // value 90
+	assert.True(t, found)
+	assert.Equal(t, 2, rank)
+
+	rank, found = sl.GetRank(3) // value 75
+	assert.True(t, found)
+	assert.Equal(t, 3, rank)
+
+	rank, found = sl.GetRank(0) // value 50
+	assert.True(t, found)
+	assert.Equal(t, 4, rank)
+
+	rank, found = sl.GetRank(6) // value 30
+	assert.True(t, found)
+	assert.Equal(t, 5, rank)
+
+	rank, found = sl.GetRank(2) // value 25
+	assert.True(t, found)
+	assert.Equal(t, 6, rank)
+
+	rank, found = sl.GetRank(4) // value 10
+	assert.True(t, found)
+	assert.Equal(t, 7, rank)
+
+	// Test non-existent key
+	rank, found = sl.GetRank(999)
+	assert.False(t, found)
+	assert.Equal(t, 0, rank)
+}

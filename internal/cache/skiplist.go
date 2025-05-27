@@ -15,6 +15,7 @@ type SkipListNode[K, V comparable] struct {
 	Key     K
 	Value   V
 	Forward []*SkipListNode[K, V]
+	Span    []int // Number of nodes this forward pointer spans at each level
 }
 
 type CompareFunc[V comparable] func(a, b V) int
@@ -39,6 +40,7 @@ type Entry[K comparable, V comparable] struct {
 func NewSkipList[K, V comparable](compareFunc CompareFunc[V]) *SkipList[K, V] {
 	header := &SkipListNode[K, V]{
 		Forward: make([]*SkipListNode[K, V], MaxLevel),
+		Span:    make([]int, MaxLevel),
 	}
 
 	return &SkipList[K, V]{
@@ -83,10 +85,18 @@ func (sl *SkipList[K, V]) InsertOrUpdate(key K, value V) bool {
 // insertNode is the internal method to insert a node
 func (sl *SkipList[K, V]) insertNode(key K, value V) bool {
 	update := make([]*SkipListNode[K, V], MaxLevel)
+	rank := make([]int, MaxLevel)
 	x := sl.header
 
 	for i := sl.level - 1; i >= 0; i-- {
+		if i == sl.level-1 {
+			rank[i] = 0
+		} else {
+			rank[i] = rank[i+1]
+		}
+
 		for x.Forward[i] != nil && sl.compare(x.Forward[i].Value, value) < 0 {
+			rank[i] += x.Span[i]
 			x = x.Forward[i]
 		}
 		update[i] = x
@@ -95,7 +105,9 @@ func (sl *SkipList[K, V]) insertNode(key K, value V) bool {
 	newLevel := sl.randomLevel()
 	if newLevel > sl.level {
 		for i := sl.level; i < newLevel; i++ {
+			rank[i] = 0
 			update[i] = sl.header
+			update[i].Span[i] = sl.length
 		}
 		sl.level = newLevel
 	}
@@ -104,11 +116,20 @@ func (sl *SkipList[K, V]) insertNode(key K, value V) bool {
 		Key:     key,
 		Value:   value,
 		Forward: make([]*SkipListNode[K, V], newLevel),
+		Span:    make([]int, newLevel),
 	}
 
 	for i := range newLevel {
 		newNode.Forward[i] = update[i].Forward[i]
 		update[i].Forward[i] = newNode
+
+		newNode.Span[i] = update[i].Span[i] - (rank[0] - rank[i])
+		update[i].Span[i] = (rank[0] - rank[i]) + 1
+	}
+
+	// Update span for higher levels
+	for i := newLevel; i < sl.level; i++ {
+		update[i].Span[i]++
 	}
 
 	// sl.keyIndex[key] = newNode
@@ -145,9 +166,11 @@ func (sl *SkipList[K, V]) deleteNode(key K, value V) bool {
 	if x != nil && sl.compare(x.Value, value) == 0 {
 		for i := 0; i < sl.level; i++ {
 			if update[i].Forward[i] != x {
-				break
+				update[i].Span[i]--
+			} else {
+				update[i].Forward[i] = x.Forward[i]
+				update[i].Span[i] += x.Span[i] - 1
 			}
-			update[i].Forward[i] = x.Forward[i]
 		}
 
 		for sl.level > 1 && sl.header.Forward[sl.level-1] == nil {
@@ -177,23 +200,22 @@ func (sl *SkipList[K, V]) Search(key K) (V, bool) {
 func (sl *SkipList[K, V]) GetRank(key K) (int, bool) {
 	// sl.mu.RLock()
 	// defer sl.mu.RUnlock()
-
 	node, exists := sl.mapIndex[key]
 	if !exists {
 		return 0, false
 	}
 
-	rank := 1
+	rank := 0
 	x := sl.header
 
 	for i := sl.level - 1; i >= 0; i-- {
 		for x.Forward[i] != nil && sl.compare(x.Forward[i].Value, node.Value) < 0 {
-			rank++
+			rank += x.Span[i]
 			x = x.Forward[i]
 		}
 	}
 
-	return rank, true
+	return rank + 1, true
 }
 
 func (sl *SkipList[K, V]) GetTopK(k int) []Entry[K, V] {
@@ -285,6 +307,7 @@ func (sl *SkipList[K, V]) Clear() {
 
 	sl.header = &SkipListNode[K, V]{
 		Forward: make([]*SkipListNode[K, V], MaxLevel),
+		Span:    make([]int, MaxLevel),
 	}
 	sl.level = 1
 	sl.length = 0

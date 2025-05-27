@@ -5,7 +5,7 @@ services:
     container_name: wrk-stress-tester
     build:
       context: ../..
-      dockerfile: ../Dockerfile.wrk
+      dockerfile: ./docker/Dockerfile.wrk
     volumes:
       - ./logs:/wrk-tests/logs
       - ./scripts/wrk:/wrk-tests/scripts/wrk

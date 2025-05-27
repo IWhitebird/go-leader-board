@@ -93,7 +93,6 @@ make run # Or with ""air" if you have go-air installed
 
 | Method | Endpoint | Description | Complexity |
 |--------|----------|-------------|------------|
-| `GET` | `/api/health` | Health check | O(1) |
 | `POST` | `/api/leaderboard/score` | Submit player score | O(log n) |
 | `GET` | `/api/leaderboard/top/{gameId}` | Get top players | O(k) |
 | `GET` | `/api/leaderboard/rank/{gameId}/{userId}` | Get player rank | O(log n) |
@@ -132,11 +131,94 @@ make wrk_write_stress
 
 ## Technical Implementation
 
+
+### Memory Usage Metrics
+
+Our leaderboard service uses a hybrid storage approach with both in-memory skip lists and PostgreSQL persistence. Here's a detailed breakdown of memory consumption (Note : This estimates does not consider CPU alignment padding) :
+
+#### Skip List Memory Analysis
+
+**Per Score Entry in Skip List:**
+```
+SkipListNode Structure:
+├── Key (int64)           : 8 bytes
+├── Value (models.Score)  : 32 bytes
+│   ├── GameID (int64)    : 8 bytes  
+│   ├── UserID (int64)    : 8 bytes
+│   ├── Score (uint64)    : 8 bytes
+│   └── Timestamp (time.Time) : 8 bytes
+├── Forward slice header  : 24 bytes
+├── Forward pointers      : ~4.3 levels × 8 bytes = ~34 bytes (average)
+├── Span slice header     : 24 bytes
+└── Span counts           : ~4.3 levels × 4 bytes = ~17 bytes (average)
+
+Total per node: ~139 bytes
+```
+
+**Skip List Overhead:**
+```
+SkipList Structure:
+├── Mutex (sync.RWMutex) : 24 bytes
+├── Length (int)         : 8 bytes  
+├── Level (int)          : 8 bytes
+├── Rand (*rand.Rand)    : 8 bytes (pointer)
+├── Header node          : ~1,634 bytes (128 max levels × (8+4) + base + headers)
+├── MapIndex overhead    : ~24 bytes per entry (map structure)
+└── Compare function     : 8 bytes (pointer)
+
+Base overhead: ~1,714 bytes per skip list
+Map overhead: ~24 bytes per entry
+```
+
+**Memory Per Game (4 Time Windows):**
+```
+GameLeaderboard Structure:
+├── 4 × LeaderBoard      : 4 × 1,714 = 6,856 bytes base
+├── 4 × Skip list nodes  : 4 × (139 + 24) × N = 652N bytes
+└── Mutex overhead       : 4 × 24 = 96 bytes
+
+Total per game: 6,952 + 652N bytes (where N = unique players)
+```
+
+#### Memory Usage Examples
+
+| Players per Game | Memory per Game | Memory for 1M Players | Memory for 10M Players |
+|------------------|-----------------|----------------------|------------------------|
+| 1,000           | 659 KB          | 652 MB               | 6.52 GB               |
+| 10,000          | 6.4 MB          | 6.52 GB              | 65.2 GB               |
+| 100,000         | 64.7 MB         | 65.2 GB              | 652 GB                |
+| 1,000,000       | 652 MB          | 652 GB               | 6.52 TB               |
+
+#### PostgreSQL Storage Analysis
+
+**Per Score Record in PostgreSQL:**
+```
+scores table row:
+├── game_id (BIGINT)     : 8 bytes
+├── user_id (BIGINT)     : 8 bytes  
+├── score (BIGINT)       : 8 bytes
+├── timestamp (TIMESTAMP): 8 bytes
+├── Row header overhead  : ~24 bytes
+└── Index overhead       : ~32 bytes (composite indexes)
+
+Total per record: ~88 bytes
+```
+
+**PostgreSQL Storage Examples:**
+
+| Total Scores | Disk Storage | Index Storage | Total Storage |
+|--------------|--------------|---------------|---------------|
+| 1 Million    | 88 MB        | 32 MB         | 120 MB        |
+| 10 Million   | 880 MB       | 320 MB        | 1.2 GB        |
+
+
 ### Caching Strategy
 
 The service uses a multi-level caching approach:
 
-1. **Skip List with map for Cache**: O(log n) insertions and lookups
+1. **Skip List with Span Counts**: O(log n) insertions, lookups, and rank queries
+   - Enhanced skip list implementation with span information for true O(log n) rank calculations
+   - Hash map indexing for O(1) key lookups
 2. **Request Caching**: Reduces repeated query overhead
 3. **Time-based Partitioning**: Separate skip lists for different time windows
 

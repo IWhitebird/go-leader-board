@@ -100,9 +100,8 @@ wrk_write_stress:
 
 build_and_push:
 	@echo "Building and pushing $(APP_NAME)..."
-	@cd docker/prod
-	@docker build -t $(DOCKER_REGISTRY)/$(APP_NAME):latest .
-	@docker push $(DOCKER_REGISTRY)/$(APP_NAME):latest
+	@docker compose -f docker/prod/docker-compose.yml build
+	@docker compose -f docker/prod/docker-compose.yml push
 
 local_infra_up:
 	@echo "Starting local infrastructure..."
@@ -114,6 +113,7 @@ local_infra_down:
 
 prod_infra_up:
 	@echo "Starting production infrastructure..."
+	@docker compose -f docker/prod/docker-compose.yml pull
 	@docker compose -f docker/prod/docker-compose.yml up -d
 
 prod_infra_down:
