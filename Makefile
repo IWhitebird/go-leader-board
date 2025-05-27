@@ -9,6 +9,7 @@
 	wrk_stress \
 	wrk_read_stress \
 	wrk_write_stress \
+	build_and_push \
 	docker_wrk_stress \
 	docker_wrk_read_stress \
 	docker_wrk_write_stress \
@@ -26,7 +27,8 @@ GOARCH ?= $(shell go env GOARCH)
 BUILD_DIR ?= ./bin
 
 # Application info
-APP_NAME = leaderboard-service
+APP_NAME = leaderboard
+DOCKER_REGISTRY = iwhitebird
 
 # Local
 
@@ -95,6 +97,12 @@ wrk_write_stress:
 
 
 # Docker
+
+build_and_push:
+	@echo "Building and pushing $(APP_NAME)..."
+	@cd docker/prod
+	@docker build -t $(DOCKER_REGISTRY)/$(APP_NAME):latest .
+	@docker push $(DOCKER_REGISTRY)/$(APP_NAME):latest
 
 local_infra_up:
 	@echo "Starting local infrastructure..."

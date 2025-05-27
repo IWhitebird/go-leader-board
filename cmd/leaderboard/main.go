@@ -16,6 +16,7 @@ import (
 	"github.com/ringg-play/leaderboard-realtime/api"
 	"github.com/ringg-play/leaderboard-realtime/config"
 	"github.com/ringg-play/leaderboard-realtime/internal/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/logging"
 	"github.com/ringg-play/leaderboard-realtime/internal/mq"
 	"github.com/ringg-play/leaderboard-realtime/internal/store"
 
@@ -27,25 +28,34 @@ import (
 func main() {
 	log.Println("Starting leaderboard service")
 
+	//Initialize context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	//Initialize configuration
 	cfg := config.NewAppConfig()
-	log.Printf("Configuration: %+v", cfg)
 
+	//Initialize logging
+	logging.Init()
+
+	//Initialize postgres
 	pgPool, pgRepo := setupPostgres(cfg)
 	defer pgPool.Close()
 
+	//Initialize in-memory store
 	store := setupStore(pgRepo, cfg)
 	defer store.Close()
 
+	//Initialize kafka
 	producer, consumer := setupKafka(cfg, store, ctx)
 	defer producer.Close()
 	defer consumer.Close()
 
+	//Initialize router
 	router := setupRouter(store, pgRepo, producer)
 	server := setupServer(cfg, router)
 
+	//Start server
 	handleGracefulShutdown(server, cancel)
 	startServer(cfg, server)
 }
