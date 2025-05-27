@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
 	"time"
 
@@ -11,12 +12,13 @@ import (
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
 )
 
-// PostgresRepository handles database operations
+//go:embed sql/init.sql
+var initSQL string
+
 type PostgresRepository struct {
 	db *sql.DB
 }
 
-// PostgresRepositoryInterface defines the interface for the PostgreSQL repository
 type PostgresRepositoryInterface interface {
 	SaveScore(score models.Score) error
 	GetTopLeaders(gameID int64, limit int, window models.TimeWindow) ([]models.LeaderboardEntry, error)
@@ -26,7 +28,6 @@ type PostgresRepositoryInterface interface {
 	GetAllScoresForGame(gameID int64) ([]models.Score, error)
 }
 
-// CreatePool creates a new connection pool to the PostgreSQL database
 func CreatePool(cfg *config.AppConfig) (*sql.DB, error) {
 	connStr := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
@@ -43,12 +44,10 @@ func CreatePool(cfg *config.AppConfig) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Set connection pool parameters
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	// Test the connection
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
@@ -56,44 +55,15 @@ func CreatePool(cfg *config.AppConfig) (*sql.DB, error) {
 	return db, nil
 }
 
-// NewPostgresRepository creates a new PostgreSQL repository
 func NewPostgresRepository(db *sql.DB) (*PostgresRepository, error) {
-	// Create the required tables if they don't exist
 	if err := initTables(db); err != nil {
 		return nil, err
 	}
-
 	return &PostgresRepository{db: db}, nil
 }
 
-// initTables creates the required tables if they don't exist
 func initTables(db *sql.DB) error {
-	// Create the scores table
-	_, err := db.Exec(`
-CREATE TABLE IF NOT EXISTS scores (
-    id SERIAL PRIMARY KEY,
-    game_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    score BIGINT NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE NOT NULL
-);
-`)
-	if err != nil {
-		return err
-	}
-
-	// Create indices separately (PostgreSQL syntax)
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_scores_game_user ON scores (game_id, user_id);`)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_scores_game_score ON scores (game_id, score DESC);`)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_scores_timestamp ON scores (timestamp);`)
+	_, err := db.Exec(initSQL)
 	if err != nil {
 		return err
 	}
@@ -101,7 +71,6 @@ CREATE TABLE IF NOT EXISTS scores (
 	return nil
 }
 
-// SaveScore saves a score to the database
 func (r *PostgresRepository) SaveScore(score models.Score) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -114,7 +83,6 @@ VALUES ($1, $2, $3, $4)
 	return err
 }
 
-// GetTopLeaders gets the top leaders for a game
 func (r *PostgresRepository) GetTopLeaders(gameID int64, limit int, window models.TimeWindow) ([]models.LeaderboardEntry, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -132,10 +100,9 @@ FROM (
         WHERE game_id = $1
     `
 
-	args := []interface{}{gameID}
+	args := []any{gameID}
 	argIndex := 2
 
-	// Add timestamp filter if needed
 	if start, end := window.GetTimeRange(); start != nil {
 		query += fmt.Sprintf(" AND timestamp BETWEEN $%d AND $%d ", argIndex, argIndex+1)
 		args = append(args, *start, end)
@@ -172,22 +139,19 @@ WHERE rank <= $` + fmt.Sprintf("%d", argIndex)
 	return entries, nil
 }
 
-// GetPlayerRank gets a player's rank and percentile for a game
 func (r *PostgresRepository) GetPlayerRank(gameID, userID int64, window models.TimeWindow) (uint64, float64, uint64, uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// First, get the player's best score
 	var score uint64
 	scoreQuery := `
 SELECT MAX(score) as score
 FROM scores
 WHERE game_id = $1 AND user_id = $2
 `
-	args := []interface{}{gameID, userID}
+	args := []any{gameID, userID}
 	argIndex := 3
 
-	// Add timestamp filter if needed
 	if start, end := window.GetTimeRange(); start != nil {
 		scoreQuery += fmt.Sprintf(" AND timestamp BETWEEN $%d AND $%d ", argIndex, argIndex+1)
 		args = append(args, *start, end)
@@ -202,17 +166,15 @@ WHERE game_id = $1 AND user_id = $2
 		return 0, 0, 0, 0, err
 	}
 
-	// Now get the rank and total players
 	rankQuery := `
 WITH player_scores AS (
     SELECT DISTINCT ON (user_id) user_id, score
     FROM scores
     WHERE game_id = $1
 `
-	rankArgs := []interface{}{gameID}
+	rankArgs := []any{gameID}
 	rankArgIndex := 2
 
-	// Add timestamp filter if needed
 	if start, end := window.GetTimeRange(); start != nil {
 		rankQuery += fmt.Sprintf(" AND timestamp BETWEEN $%d AND $%d ", rankArgIndex, rankArgIndex+1)
 		rankArgs = append(rankArgs, *start, end)
@@ -235,7 +197,6 @@ SELECT
 		return 0, 0, 0, 0, err
 	}
 
-	// Calculate percentile
 	var percentile float64
 	if total > 0 {
 		percentile = 100.0 * float64(total-rank) / float64(total)
@@ -244,7 +205,6 @@ SELECT
 	return rank, percentile, score, total, nil
 }
 
-// SaveScoreBatch saves multiple scores to the database in a single transaction
 func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 	if len(scores) == 0 {
 		return nil
@@ -253,7 +213,6 @@ func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Begin a transaction
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -264,7 +223,6 @@ func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 		}
 	}()
 
-	// Prepare the statement for batch insert
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO scores (game_id, user_id, score, timestamp)
 		VALUES ($1, $2, $3, $4)
@@ -274,7 +232,6 @@ func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 	}
 	defer stmt.Close()
 
-	// Execute for each score
 	for _, score := range scores {
 		_, err = stmt.ExecContext(ctx, score.GameID, score.UserID, score.Score, score.Timestamp)
 		if err != nil {
@@ -282,7 +239,6 @@ func (r *PostgresRepository) SaveScoreBatch(scores []models.Score) error {
 		}
 	}
 
-	// Commit the transaction
 	return tx.Commit()
 }
 
@@ -318,7 +274,6 @@ ORDER BY game_id
 	return games, nil
 }
 
-// GetAllScores gets all scores from the database for initialization
 func (r *PostgresRepository) GetAllScores() ([]models.Score, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -351,7 +306,6 @@ ORDER BY game_id, timestamp DESC
 	return scores, nil
 }
 
-// GetAllScoresForGame gets all scores for a specific game from the database
 func (r *PostgresRepository) GetAllScoresForGame(gameID int64) ([]models.Score, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

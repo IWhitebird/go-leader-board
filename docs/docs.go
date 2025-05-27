@@ -106,7 +106,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/leaderboard/score/{gameId}": {
+        "/api/leaderboard/score": {
             "post": {
                 "description": "Records a new score for a player in a game",
                 "consumes": [
@@ -120,13 +120,6 @@ const docTemplate = `{
                 ],
                 "summary": "Submit a player's score",
                 "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Game ID",
-                        "name": "gameId",
-                        "in": "path",
-                        "required": true
-                    },
                     {
                         "description": "Score data",
                         "name": "score",

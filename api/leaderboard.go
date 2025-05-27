@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/internal/db"
+	"github.com/ringg-play/leaderboard-realtime/internal/logging"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
 	"github.com/ringg-play/leaderboard-realtime/internal/mq"
 	"github.com/ringg-play/leaderboard-realtime/internal/store"
@@ -29,7 +29,6 @@ import (
 // @Router       /api/leaderboard/top/{gameId} [get]
 func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.InMemoryStore) gin.HandlerFunc {
 	return responseCache.CachePage(responseCacheStore, time.Second*5, func(c *gin.Context) {
-		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
 		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
 		if err != nil {
@@ -37,7 +36,6 @@ func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.In
 			return
 		}
 
-		// Parse limit from query
 		limitStr := c.DefaultQuery("limit", "10")
 		limit, err := strconv.Atoi(limitStr)
 		if err != nil || limit <= 0 {
@@ -45,20 +43,22 @@ func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.In
 			return
 		}
 
-		// Parse time window from query
 		windowStr := c.DefaultQuery("window", "")
-		window := models.FromQueryParam(windowStr)
+		window, err := models.FromQueryParam(windowStr)
 
-		// Get top leaders
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid window"})
+			return
+		}
+
 		leaders := store.GetTopLeaders(gameID, limit, window)
-		// totalPlayers := store.TotalPlayers(gameID)
+		totalPlayers := store.TotalPlayers(gameID)
 
-		// Return response
 		c.JSON(http.StatusOK, models.TopLeadersResponse{
-			GameID:  gameID,
-			Leaders: leaders,
-			// TotalPlayers: totalPlayers,
-			Window: window.Display,
+			GameID:       gameID,
+			Leaders:      leaders,
+			TotalPlayers: totalPlayers,
+			Window:       window.Display,
 		})
 	})
 }
@@ -78,7 +78,6 @@ func GetTopLeadersHandler(store *store.Store, responseCacheStore *persistence.In
 // @Router       /api/leaderboard/rank/{gameId}/{userId} [get]
 func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.InMemoryStore) gin.HandlerFunc {
 	return responseCache.CachePage(responseCacheStore, time.Second*5, func(c *gin.Context) {
-		// Parse game ID from path
 		gameIDStr := c.Param("gameId")
 		gameID, err := strconv.ParseInt(gameIDStr, 10, 64)
 		if err != nil {
@@ -86,7 +85,6 @@ func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.In
 			return
 		}
 
-		// Parse user ID from path
 		userIDStr := c.Param("userId")
 		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
@@ -94,19 +92,20 @@ func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.In
 			return
 		}
 
-		// Parse time window from query
 		windowStr := c.DefaultQuery("window", "")
-		window := models.FromQueryParam(windowStr)
+		window, err := models.FromQueryParam(windowStr)
 
-		// Get player rank
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid window"})
+			return
+		}
+
 		rank, percentile, score, total, exists := store.GetPlayerRank(gameID, userID, window)
 		if !exists {
-			// c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
 			c.JSON(http.StatusOK, gin.H{"error": "Player not found"})
 			return
 		}
 
-		// Return response
 		c.JSON(http.StatusOK, models.PlayerRankResponse{
 			GameID:       gameID,
 			UserID:       userID,
@@ -131,31 +130,33 @@ func GetPlayerRankHandler(store *store.Store, responseCacheStore *persistence.In
 // @Router       /api/leaderboard/score [post]
 func SubmitScoreHandler(store *store.Store, pgRepo db.PostgresRepositoryInterface, producer *mq.KafkaProducer) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Parse score from request body
 		var score models.Score
 		if err := c.ShouldBindJSON(&score); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid score data"})
 			return
 		}
 
-		// Set timestamp if not provided
 		if score.Timestamp.IsZero() {
 			score.Timestamp = time.Now().UTC()
 		}
 
-		// Validate score
 		if score.GameID <= 0 || score.UserID <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid game ID or user ID"})
 			return
 		}
 
-		// Send score to Kafka
-		if err := producer.SendScore(c.Request.Context(), score); err != nil {
-			// Log error, but don't block the request
-			log.Printf("Error sending score to Kafka: %v", err)
+		if err := store.AddScore(score); err != nil {
+			logging.Error("Error adding score to store:", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save score"})
+			return
 		}
 
-		// Return success
+		if producer != nil {
+			if err := producer.SendScore(c.Request.Context(), score); err != nil {
+				logging.Error("Error sending score to Kafka:", err)
+			}
+		}
+
 		c.Status(http.StatusOK)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
@@ -19,8 +20,9 @@ func setupRouter() (*gin.Engine, *store.Store) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	store := store.NewStore(nil)
+	responseCache := persistence.NewInMemoryStore(time.Minute)
 
-	api.ConfigureRoutes(router, store, nil, nil, nil)
+	api.ConfigureRoutes(router, store, nil, nil, responseCache)
 
 	return router, store
 }
@@ -123,7 +125,7 @@ func TestGetPlayerRankHandler(t *testing.T) {
 	req, _ = http.NewRequest("GET", "/api/leaderboard/rank/1/99", nil)
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Test invalid game ID
 	w = httptest.NewRecorder()

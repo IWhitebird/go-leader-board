@@ -64,8 +64,7 @@ func TestSkipList_Insert(t *testing.T) {
 	// Old score should be gone - search by key should still work
 	value, found = sl.Search("user1")
 	assert.True(t, found)
-	assert.Equal(t, 50, value) // should be the new better score
-
+	assert.Equal(t, 50, value)
 	sl.InsertOrUpdate("user2", 75)
 	sl.InsertOrUpdate("user3", 25)
 

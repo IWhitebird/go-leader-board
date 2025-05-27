@@ -1,19 +1,17 @@
 package models
 
 import (
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/ringg-play/leaderboard-realtime/internal/logging"
 )
 
-// HealthResponse is the response for the health endpoint
 type HealthResponse struct {
 	Status    string    `json:"status"`
 	Version   string    `json:"version"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Score represents a player's score in a game
 type Score struct {
 	GameID    int64     `json:"game_id"`
 	UserID    int64     `json:"user_id"`
@@ -37,14 +35,12 @@ func ScoreCompare(a, b Score) int {
 	return 0
 }
 
-// LeaderboardEntry represents a player's position on the leaderboard
 type LeaderboardEntry struct {
 	UserID int64  `json:"user_id"`
 	Score  uint64 `json:"score"`
 	Rank   uint64 `json:"rank"`
 }
 
-// TopLeadersResponse is the response for the top leaders endpoint
 type TopLeadersResponse struct {
 	GameID       int64              `json:"game_id"`
 	Leaders      []LeaderboardEntry `json:"leaders"`
@@ -52,7 +48,6 @@ type TopLeadersResponse struct {
 	Window       string             `json:"window,omitempty"`
 }
 
-// PlayerRankResponse is the response for the player rank endpoint
 type PlayerRankResponse struct {
 	GameID       int64   `json:"game_id"`
 	UserID       int64   `json:"user_id"`
@@ -63,35 +58,28 @@ type PlayerRankResponse struct {
 	Window       string  `json:"window,omitempty"`
 }
 
-// TimeWindow represents the time period for leaderboard queries
 type TimeWindow struct {
-	// Duration in hours (0 = all time)
-	Hours int
-	// Display name of the window (e.g., "24h", "3d", "7d", "all")
+	Hours   int
 	Display string
 }
 
-// GetLeaderboardIndex returns the array index for this time window
-// This enables O(1) leaderboard access instead of map lookups
 func (w TimeWindow) GetLeaderboardIndex() int {
 	switch w.Hours {
 	case 0:
-		return 0 // AllTime
+		return 0
 	case 24:
-		return 1 // Last24Hours
+		return 1
 	case 72:
-		return 2 // Last3Days
+		return 2
 	case 168:
-		return 3 // Last7Days
+		return 3
 	default:
-		return 0 // Default to AllTime for unsupported windows
+		return 0
 	}
 }
 
-// LeaderboardIndexCount represents the total number of predefined leaderboard types
 const LeaderboardIndexCount = 4
 
-// Predefined time windows with their indices
 var (
 	AllTime     = TimeWindow{Hours: 0, Display: "all"}
 	Last24Hours = TimeWindow{Hours: 24, Display: "24h"}
@@ -99,45 +87,53 @@ var (
 	Last7Days   = TimeWindow{Hours: 168, Display: "7d"}
 )
 
-// AllTimeWindows returns all predefined time windows in index order
 func AllTimeWindows() [LeaderboardIndexCount]TimeWindow {
 	return [LeaderboardIndexCount]TimeWindow{
-		AllTime,     // index 0
-		Last24Hours, // index 1
-		Last3Days,   // index 2
-		Last7Days,   // index 3
+		AllTime,
+		Last24Hours,
+		Last3Days,
+		Last7Days,
 	}
 }
 
-func FromQueryParam(window string) TimeWindow {
-	if window == "" {
-		return AllTime
+func FromQueryParam(window string) (TimeWindow, error) {
+	switch window {
+	case "":
+		return AllTime, nil
+	case "24h":
+		return Last24Hours, nil
+	case "3d":
+		return Last3Days, nil
+	case "7d":
+		return Last7Days, nil
+	default:
+		logging.Error("invalid window", "window", window)
+		return AllTime, nil
 	}
 
-	// Handle day-based windows
-	if strings.HasSuffix(window, "d") {
-		days, err := strconv.Atoi(window[:len(window)-1])
-		if err == nil && days > 0 {
-			return TimeWindow{
-				Hours:   days * 24,
-				Display: window,
-			}
-		}
-	}
+	// // Handle day-based windows
+	// if strings.HasSuffix(window, "d") {
+	// 	days, err := strconv.Atoi(window[:len(window)-1])
+	// 	if err == nil && days > 0 {
+	// 		return TimeWindow{
+	// 			Hours:   days * 24,
+	// 			Display: window,
+	// 		}
+	// 	}
+	// }
 
-	// Handle hour-based windows
-	if strings.HasSuffix(window, "h") {
-		hours, err := strconv.Atoi(window[:len(window)-1])
-		if err == nil && hours > 0 {
-			return TimeWindow{
-				Hours:   hours,
-				Display: window,
-			}
-		}
-	}
+	// // Handle hour-based windows
+	// if strings.HasSuffix(window, "h") {
+	// 	hours, err := strconv.Atoi(window[:len(window)-1])
+	// 	if err == nil && hours > 0 {
+	// 		return TimeWindow{
+	// 			Hours:   hours,
+	// 			Display: window,
+	// 		}
+	// 	}
+	// }
 
-	// // Default to all time if parameter is not recognized
-	return AllTime
+	// return AllTime
 }
 
 // GetCutoffTime returns the cutoff time for filtering scores based on the time window

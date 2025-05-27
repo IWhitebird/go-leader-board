@@ -8,10 +8,6 @@ BUILD_DIR ?= ./bin
 
 # Application info
 APP_NAME = leaderboard-service
-VERSION ?= 1.0.0
-
-# Docker compose files
-DOCKER_COMPOSE = docker-compose.yml
 
 dev:
 	@echo "Starting development server with hot reload..."

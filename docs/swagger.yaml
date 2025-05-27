@@ -123,17 +123,12 @@ paths:
       summary: Get a player's rank
       tags:
       - leaderboard
-  /api/leaderboard/score/{gameId}:
+  /api/leaderboard/score:
     post:
       consumes:
       - application/json
       description: Records a new score for a player in a game
       parameters:
-      - description: Game ID
-        in: path
-        name: gameId
-        required: true
-        type: integer
       - description: Score data
         in: body
         name: score

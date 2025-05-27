@@ -4,16 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/ringg-play/leaderboard-realtime/config"
+	"github.com/ringg-play/leaderboard-realtime/internal/logging"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
 	"github.com/ringg-play/leaderboard-realtime/internal/store"
 	"github.com/segmentio/kafka-go"
 )
 
-// KafkaConsumer handles consuming and processing score messages from Kafka
 type KafkaConsumer struct {
 	reader        *kafka.Reader
 	store         *store.Store
@@ -24,7 +23,6 @@ type KafkaConsumer struct {
 	consumerGroup string
 }
 
-// NewKafkaConsumer creates a new Kafka consumer
 func NewKafkaConsumer(cfg *config.AppConfig, store *store.Store) (*KafkaConsumer, error) {
 	consumer := &KafkaConsumer{
 		store:         store,
@@ -42,7 +40,7 @@ func NewKafkaConsumer(cfg *config.AppConfig, store *store.Store) (*KafkaConsumer
 		if err = consumer.connect(); err == nil {
 			break
 		}
-		log.Printf("Failed to connect consumer to Kafka (attempt %d/%d): %v", i+1, maxRetries, err)
+		logging.Error("Failed to connect consumer to Kafka", "attempt", i+1, "max", maxRetries, "error", err)
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
@@ -53,9 +51,7 @@ func NewKafkaConsumer(cfg *config.AppConfig, store *store.Store) (*KafkaConsumer
 	return consumer, nil
 }
 
-// connect establishes connection to Kafka
 func (c *KafkaConsumer) connect() error {
-	// Verify topic exists by connecting to a broker
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -65,7 +61,6 @@ func (c *KafkaConsumer) connect() error {
 	}
 	defer conn.Close()
 
-	// List topics to check if our topic exists
 	topics, err := conn.ReadPartitions()
 	if err != nil {
 		return fmt.Errorf("failed to read topics: %v", err)
@@ -80,10 +75,8 @@ func (c *KafkaConsumer) connect() error {
 	}
 
 	if !topicExists {
-		log.Printf("Warning: Topic %s does not exist, consumer may not function correctly", c.topic)
+		logging.Error("Topic does not exist, consumer may not function correctly", "topic", c.topic)
 	}
-
-	// Create Kafka reader with consumer group configuration
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:         c.brokers,
 		Topic:           c.topic,
@@ -98,27 +91,24 @@ func (c *KafkaConsumer) connect() error {
 	})
 
 	c.reader = reader
-	log.Printf("Created Kafka consumer with topic: %s, consumer group: %s", c.topic, c.consumerGroup)
+	logging.Info("Created Kafka consumer", "topic", c.topic, "group", c.consumerGroup)
 	return nil
 }
 
-// StartConsumer starts the consumer to process score messages
 func (c *KafkaConsumer) StartConsumer(ctx context.Context) {
-	log.Printf("Starting Kafka consumer for topic: %s", c.topic)
+	logging.Info("Starting Kafka consumer", "topic", c.topic)
 
 	go func() {
 		defer c.reader.Close()
 
-		// Process messages in batches
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("Kafka consumer shutting down")
+				logging.Info("Kafka consumer shutting down")
 				return
 			default:
 				if err := c.processBatch(ctx); err != nil {
-					log.Printf("Error processing batch: %v", err)
-					// Add a small delay before retrying to avoid tight loops on persistent errors
+					logging.Error("Error processing batch", "error", err)
 					time.Sleep(time.Second * 2)
 				}
 			}
@@ -126,67 +116,55 @@ func (c *KafkaConsumer) StartConsumer(ctx context.Context) {
 	}()
 }
 
-// processBatch processes a batch of score messages
 func (c *KafkaConsumer) processBatch(ctx context.Context) error {
 	batch := make([]models.Score, 0, c.batchSize)
 	timer := time.NewTimer(c.timeout)
 	defer timer.Stop()
 
-	// Create a context with timeout for batch processing
 	batchCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	// Collect messages until batch size is reached or timeout occurs
 	for len(batch) < c.batchSize {
 		select {
 		case <-timer.C:
-			// Timeout reached, process the batch even if not full
 			if len(batch) > 0 {
 				return c.saveBatch(batch)
 			}
 			return nil
 		case <-ctx.Done():
-			// Context canceled, save any pending messages and exit
 			if len(batch) > 0 {
 				return c.saveBatch(batch)
 			}
 			return ctx.Err()
 		default:
-			// Try to fetch a message with a short timeout
 			fetchCtx, fetchCancel := context.WithTimeout(batchCtx, 100*time.Millisecond)
 			message, err := c.reader.FetchMessage(fetchCtx)
 			fetchCancel()
 
 			if err != nil {
-				// If timeout, continue to check other conditions
 				if err == context.DeadlineExceeded {
 					continue
 				}
 				return fmt.Errorf("error fetching message from Kafka: %v", err)
 			}
 
-			// Parse the score
 			var score models.Score
 			if err := json.Unmarshal(message.Value, &score); err != nil {
-				log.Printf("Error unmarshaling score: %v", err)
-				// Commit the invalid message to avoid getting stuck
+				logging.Error("Error unmarshaling score", "error", err)
 				if commitErr := c.reader.CommitMessages(ctx, message); commitErr != nil {
-					log.Printf("Error committing invalid message: %v", commitErr)
+					logging.Error("Error committing invalid message", "error", commitErr)
 				}
 				continue
 			}
 
-			// Add to batch
 			batch = append(batch, score)
 
-			// Commit the message
 			if err := c.reader.CommitMessages(ctx, message); err != nil {
 				return fmt.Errorf("error committing message: %v", err)
 			}
 		}
 	}
 
-	// Process full batch
 	if len(batch) > 0 {
 		return c.saveBatch(batch)
 	}
@@ -194,24 +172,21 @@ func (c *KafkaConsumer) processBatch(ctx context.Context) error {
 	return nil
 }
 
-// saveBatch saves a batch of scores
 func (c *KafkaConsumer) saveBatch(batch []models.Score) error {
 	if len(batch) == 0 {
 		return nil
 	}
 
-	log.Printf("Saving batch of %d scores to PostgreSQL and updating cache", len(batch))
+	logging.Info("Saving batch of scores", "count", len(batch))
 
-	// Use the batch insert method which now saves to PostgreSQL first, then cache
 	if err := c.store.SaveScoreBatch(batch); err != nil {
-		log.Printf("Error saving batch to PostgreSQL and cache: %v", err)
+		logging.Error("Error saving batch", "error", err)
 		return fmt.Errorf("failed to save batch: %v", err)
 	}
 
 	return nil
 }
 
-// Close closes the Kafka consumer
 func (c *KafkaConsumer) Close() error {
 	if c.reader != nil {
 		return c.reader.Close()

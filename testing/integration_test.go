@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-gonic/gin"
 	"github.com/ringg-play/leaderboard-realtime/api"
 	"github.com/ringg-play/leaderboard-realtime/internal/models"
@@ -20,26 +21,22 @@ import (
 func setupTestServer(t *testing.T) (*gin.Engine, *store.Store) {
 	gin.SetMode(gin.TestMode)
 
-	// Create temp data directory
 	dataDir := "test_data"
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		t.Fatalf("Failed to create test data directory: %v", err)
 	}
 
-	// Create WAL directory
 	walDir := filepath.Join(dataDir, "wal")
 	if err := os.MkdirAll(walDir, 0755); err != nil {
 		t.Fatalf("Failed to create WAL directory: %v", err)
 	}
 
-	// Initialize in-memory store
 	store := store.NewStore(nil)
+	responseCache := persistence.NewInMemoryStore(time.Minute)
 
-	// Create a router
 	router := gin.New()
 
-	// Configure routes
-	api.ConfigureRoutes(router, store, nil, nil, nil)
+	api.ConfigureRoutes(router, store, nil, nil, responseCache)
 
 	return router, store
 }

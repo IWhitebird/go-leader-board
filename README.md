@@ -6,6 +6,7 @@ A high-performance, real-time leaderboard service built with Go, featuring Kafka
 
 Our service delivers exceptional performance under load:
 
+This example running 2 read and 1 write api concurrently.
 ![Load Test Results](assets/load_test.png)
 
 **Single Instance Performance:**
@@ -62,7 +63,7 @@ docker compose up -d
 
 Running server Locally  
 
-Start dependencies:
+Start database and kafka:
 ```bash
 docker compose up postgres kafka -d
 ```
@@ -195,11 +196,11 @@ We should configure Kafka so that message batches (~5000 messages) contain score
 
 ### Database Considerations
 
-Sharding the database by game_id would be a smart move as we scale up.
+Sharding the database by game_id using cockroachdb would increase our startup latences and eventual writes.
 
 ### Time Window Data Management
 
-There's an interesting challenge with our time-based windows. We store separate skip lists for different time ranges, but over time these will accumulate stale data that falls outside the window (except for the "all" case). We'll need some cleanup mechanism to handle this.
+There's an interesting challenge with our time-based windows. We store separate skip lists for different time ranges, but over time these will accumulate stale data that falls outside the window (except for the "all" case).
 
 Our current structure looks like:
 ```
@@ -208,4 +209,4 @@ map[game_id] -> [all]  -> ['All Skiplist']
                 [72hr] -> ['72hr Skiplist']
 ```
 
-The time-based lists will need periodic cleanup to remove expired entries.
+The time-based lists are periodically cleaned up to remove expired entries.
