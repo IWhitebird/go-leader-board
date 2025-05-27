@@ -108,7 +108,7 @@ The leaderboard endpoints support an optional `window` parameter:
 
 ### API Documentation
 
-Interactive API documentation is available at `http://localhost/swagger/index.html`
+Interactive API documentation is available at `http://localhost:8080/swagger/index.html`
 
 ## Load Testing
 
